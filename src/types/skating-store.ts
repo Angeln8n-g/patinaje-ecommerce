@@ -1,0 +1,88 @@
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface Banner {
+  id: string;
+  title: string;
+  description?: string;
+  image_url: string;
+  link_url?: string;
+  active: boolean;
+  display_order: number;
+  created_at: string;
+}
+
+export type ProductCategory = string; // Now dynamic
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: ProductCategory;
+  images: string[];
+  stock: number;
+  featured: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+export interface ShippingInfo {
+  fullName: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  phone: string;
+}
+
+export interface Order {
+  id: string;
+  user_id?: string;
+  items: CartItem[];
+  shipping: ShippingInfo;
+  total: number;
+  status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
+  created_at: string;
+}
+
+export type ShipmentStatus = 'ASIGNADO' | 'EN_RUTA' | 'CERCA' | 'ENTREGADO';
+
+export interface Shipment {
+  id: string;
+  order_id: string;
+  delivery_man_id: string | null;
+  status: ShipmentStatus;
+  current_lat: number | null;
+  current_lng: number | null;
+  estimated_time: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserRole = 'USER' | 'ADMIN' | 'DELIVERY';
+
+export interface Profile {
+  id: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at: string;
+}
