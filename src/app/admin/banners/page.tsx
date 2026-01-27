@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Trash2, Plus, ExternalLink } from "lucide-react";
+import { PromoTextManager } from "@/components/admin/PromoTextManager";
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -96,120 +98,141 @@ export default function BannersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Banners Promocionales</h1>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Banner
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Crear Banner</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Título</Label>
-                <Input 
-                  value={newBanner.title} 
-                  onChange={(e) => setNewBanner(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Oferta de Verano"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Descripción (Opcional)</Label>
-                <Input 
-                  value={newBanner.description} 
-                  onChange={(e) => setNewBanner(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Descuentos de hasta 50%"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>URL de Imagen</Label>
-                <Input 
-                  value={newBanner.image_url} 
-                  onChange={(e) => setNewBanner(prev => ({ ...prev, image_url: e.target.value }))}
-                  placeholder="https://..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Link de Destino (Opcional)</Label>
-                <Input 
-                  value={newBanner.link_url} 
-                  onChange={(e) => setNewBanner(prev => ({ ...prev, link_url: e.target.value }))}
-                  placeholder="/skating-store/catalogo"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Orden</Label>
-                <Input 
-                  type="number"
-                  value={newBanner.display_order} 
-                  onChange={(e) => setNewBanner(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Activo</Label>
-                <Switch 
-                  checked={newBanner.active} 
-                  onCheckedChange={(checked) => setNewBanner(prev => ({ ...prev, active: checked }))} 
-                />
-              </div>
-              <Button onClick={handleCreate} className="w-full">Guardar</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Gestión de Banners</h1>
       </div>
 
-      <div className="bg-card rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Orden</TableHead>
-              <TableHead>Imagen</TableHead>
-              <TableHead>Título</TableHead>
-              <TableHead>Link</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-[100px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {banners.map((banner) => (
-              <TableRow key={banner.id}>
-                <TableCell>{banner.display_order}</TableCell>
-                <TableCell>
-                  <img 
-                    src={banner.image_url} 
-                    alt={banner.title} 
-                    className="h-10 w-20 object-cover rounded"
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{banner.title}</TableCell>
-                <TableCell>
-                  {banner.link_url && (
-                    <a href={banner.link_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Switch 
-                    checked={banner.active} 
-                    onCheckedChange={() => handleToggleActive(banner.id, banner.active)} 
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(banner.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <Tabs defaultValue="carousel" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+          <TabsTrigger value="carousel">Carrusel Principal</TabsTrigger>
+          <TabsTrigger value="promo">Banner de Envíos</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="carousel" className="space-y-6 mt-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Banners del Carrusel</h2>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Banner
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                {/* ... existing dialog content ... */}
+                <DialogHeader>
+                  <DialogTitle>Crear Banner</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Título</Label>
+                    <Input 
+                      value={newBanner.title} 
+                      onChange={(e) => setNewBanner(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Oferta de Verano"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descripción (Opcional)</Label>
+                    <Input 
+                      value={newBanner.description} 
+                      onChange={(e) => setNewBanner(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Descuentos de hasta 50%"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>URL de Imagen, GIF o Video</Label>
+                    <Input 
+                      value={newBanner.image_url} 
+                      onChange={(e) => setNewBanner(prev => ({ ...prev, image_url: e.target.value }))}
+                      placeholder="https://... (JPG, PNG, GIF, MP4, WEBM)"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Soporta imágenes estáticas, GIFs animados y videos (MP4, WebM).
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Link de Destino (Opcional)</Label>
+                    <Input 
+                      value={newBanner.link_url} 
+                      onChange={(e) => setNewBanner(prev => ({ ...prev, link_url: e.target.value }))}
+                      placeholder="/skating-store/catalogo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Orden</Label>
+                    <Input 
+                      type="number"
+                      value={newBanner.display_order} 
+                      onChange={(e) => setNewBanner(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Activo</Label>
+                    <Switch 
+                      checked={newBanner.active} 
+                      onCheckedChange={(checked) => setNewBanner(prev => ({ ...prev, active: checked }))} 
+                    />
+                  </div>
+                  <Button onClick={handleCreate} className="w-full">Guardar</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="bg-card rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Orden</TableHead>
+                  <TableHead>Imagen</TableHead>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Link</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="w-[100px]">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {banners.map((banner) => (
+                  <TableRow key={banner.id}>
+                    <TableCell>{banner.display_order}</TableCell>
+                    <TableCell>
+                      <img 
+                        src={banner.image_url} 
+                        alt={banner.title} 
+                        className="h-10 w-20 object-cover rounded"
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{banner.title}</TableCell>
+                    <TableCell>
+                      {banner.link_url && (
+                        <a href={banner.link_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700">
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Switch 
+                        checked={banner.active} 
+                        onCheckedChange={() => handleToggleActive(banner.id, banner.active)} 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(banner.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="promo" className="mt-6">
+          <PromoTextManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

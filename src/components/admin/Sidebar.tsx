@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, Truck, Tags, Megaphone } from "lucide-react";
+import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, Truck, Tags, Megaphone, Store } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
@@ -57,7 +57,13 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-card px-3 py-4">
@@ -81,11 +87,21 @@ export function Sidebar() {
         ))}
       </div>
 
-      <div className="mt-auto border-t pt-4">
+      <div className="mt-auto border-t pt-4 space-y-2">
+        <Link href="/skating-store">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-3"
+          >
+            <Store className="h-4 w-4" />
+            Volver a Tienda
+          </Button>
+        </Link>
+        
         <Button 
           variant="ghost" 
           className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
-          onClick={() => signOut()}
+          onClick={handleSignOut}
         >
           <LogOut className="h-4 w-4" />
           Cerrar Sesión
