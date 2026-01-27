@@ -14,6 +14,18 @@ interface PromoCarouselProps {
 export function PromoCarousel({ banners }: PromoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Helper to validate image URL
+  const getValidImageUrl = (url: string) => {
+    if (!url) return "https://placehold.co/1200x500/png?text=No+Image";
+    if (url.startsWith("/")) return url;
+    try {
+      new URL(url);
+      return url;
+    } catch {
+      return "https://placehold.co/1200x500/png?text=Invalid+Image";
+    }
+  };
+
   // Auto-advance
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -37,6 +49,11 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
     setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
   };
 
+  // Helper to check if URL is a video
+  const isVideo = (url: string) => {
+    return url.toLowerCase().match(/\.(mp4|webm|ogg)$/);
+  };
+
   return (
     <section className="relative h-[400px] md:h-[500px] w-full overflow-hidden rounded-lg mb-12 group">
       {/* Slides */}
@@ -47,15 +64,27 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
             index === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
           }`}
         >
-          {/* Background Image */}
+          {/* Background Media */}
           <div className="absolute inset-0">
-            <Image
-              src={banner.image_url}
-              alt={banner.title}
-              fill
-              className="object-cover"
-              priority={index === 0}
-            />
+            {isVideo(banner.image_url) ? (
+              <video
+                src={banner.image_url}
+                className="w-full h-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            ) : (
+              <Image
+                src={getValidImageUrl(banner.image_url)}
+                alt={banner.title}
+                fill
+                className="object-cover"
+                priority={index === 0}
+                unoptimized={banner.image_url.toLowerCase().endsWith('.gif')}
+              />
+            )}
             {/* Overlay */}
             <div className="absolute inset-0 bg-black/40" />
           </div>

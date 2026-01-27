@@ -27,9 +27,8 @@ export default function CheckoutPage() {
     setIsLoading(true);
     try {
       await createOrder(items, data, total);
-      toast.success("¡Pedido realizado con éxito!");
       clearCart();
-      router.push("/skating-store");
+      router.push("/skating-store/checkout/success");
     } catch (error) {
       console.error(error);
       toast.error("Hubo un error al procesar tu pedido. Inténtalo de nuevo.");
