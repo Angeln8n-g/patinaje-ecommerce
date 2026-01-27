@@ -66,8 +66,18 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
 
   const addItem = async (product: Product, quantity: number) => {
     if (!user) {
-      toast.error("Debes iniciar sesión para agregar al carrito");
-      router.push("/login");
+      setItems(currentItems => {
+        const existingItem = currentItems.find(item => item.product.id === product.id);
+        if (existingItem) {
+          return currentItems.map(item => 
+            item.product.id === product.id 
+              ? { ...item, quantity: item.quantity + quantity }
+              : item
+          );
+        }
+        return [...currentItems, { product, quantity }];
+      });
+      toast.success("Añadido al carrito");
       return;
     }
 
@@ -91,6 +101,7 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
         console.error("Detailed server error:", result.error);
         throw new Error(typeof result.error === 'string' ? result.error : "Failed to add to cart");
       }
+      toast.success("Añadido al carrito");
       
     } catch (error) {
       console.error("Error adding item:", error);
@@ -102,7 +113,10 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeItem = async (productId: string) => {
-    if (!user) return;
+    if (!user) {
+      setItems(currentItems => currentItems.filter(item => item.product.id !== productId));
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -117,10 +131,19 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateQuantity = async (productId: string, quantity: number) => {
-    if (!user) return;
-
     if (quantity <= 0) {
       await removeItem(productId);
+      return;
+    }
+
+    if (!user) {
+      setItems(currentItems => 
+        currentItems.map(item => 
+          item.product.id === productId 
+            ? { ...item, quantity }
+            : item
+        )
+      );
       return;
     }
 

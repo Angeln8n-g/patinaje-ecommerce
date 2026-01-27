@@ -17,6 +17,23 @@ export interface Banner {
   created_at: string;
 }
 
+export interface PromoTextBanner {
+  id: string;
+  title: string;
+  prefix_text: string;
+  highlight_text: string;
+  suffix_text: string;
+  image_url?: string;
+  bg_color: string;
+  active: boolean;
+}
+
+export interface StaticContent {
+  slug: string;
+  data: Record<string, any>;
+  updated_at: string;
+}
+
 export type ProductCategory = string; // Now dynamic
 
 export interface Product {
@@ -77,6 +94,14 @@ export interface Profile {
   role: UserRole;
   created_at: string;
   updated_at: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  address_street?: string;
+  address_city?: string;
+  address_state?: string;
+  address_postal_code?: string;
+  address_country?: string;
 }
 
 export interface ContactMessage {
