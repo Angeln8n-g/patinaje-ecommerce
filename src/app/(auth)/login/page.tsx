@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { LogIn, Mail, Lock } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -19,6 +21,8 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -32,6 +36,7 @@ export default function LoginPage() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
+    setShouldShake(false);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: values.email,
@@ -46,17 +51,59 @@ export default function LoginPage() {
       router.push("/skating-store");
       router.refresh();
     } catch (error: any) {
+      setShouldShake(true);
+      setTimeout(() => setShouldShake(false), 500);
       toast.error(error.message || "Error al iniciar sesión");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleForgotPassword = async () => {
+    const email = form.getValues("email")?.trim();
+    
+    if (!email) {
+      toast.error("Por favor, ingresa tu email en el campo correspondiente");
+      form.setFocus("email");
+      return;
+    }
+
+    // Validar formato de email antes de intentar resetear
+    const emailResult = z.string().email().safeParse(email);
+    if (!emailResult.success) {
+      toast.error("Por favor, ingresa un email válido");
+      form.setFocus("email");
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Se ha enviado un enlace de recuperación a tu email. Por favor, revisa tu bandeja de entrada.");
+    } catch (error: any) {
+      console.error("Error en resetPassword:", error);
+      toast.error(error.message || "Error al enviar el enlace de recuperación");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="container max-w-md py-20">
-      <div className="bg-card p-8 rounded-lg border shadow-sm">
+      <div className={cn(
+        "bg-card p-8 rounded-lg border shadow-sm transition-transform",
+        shouldShake && "animate-shake border-destructive shadow-destructive/20"
+      )}>
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Iniciar Sesión</h1>
+          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <LogIn className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold uppercase italic tracking-tighter">Iniciar Sesión</h1>
           <p className="text-muted-foreground mt-2">Accede a tu cuenta para comprar</p>
         </div>
 
@@ -69,7 +116,10 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="tu@email.com" {...field} />
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="tu@email.com" className="pl-10" {...field} />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -80,15 +130,28 @@ export default function LoginPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Contraseña</FormLabel>
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={isResetting}
+                      className="text-xs text-primary hover:underline font-bold disabled:opacity-50"
+                    >
+                      {isResetting ? "Enviando..." : "¿Olvidaste tu contraseña?"}
+                    </button>
+                  </div>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input type="password" placeholder="******" className="pl-10" {...field} />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full font-black uppercase tracking-widest h-12 rounded-full" disabled={isLoading}>
               {isLoading ? "Cargando..." : "Entrar"}
             </Button>
           </form>
@@ -97,7 +160,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center text-sm">
           <p className="text-muted-foreground">
             ¿No tienes cuenta?{" "}
-            <Link href="/register" className="text-primary hover:underline font-medium">
+            <Link href="/register" className="text-primary hover:underline font-black uppercase tracking-wider">
               Regístrate aquí
             </Link>
           </p>

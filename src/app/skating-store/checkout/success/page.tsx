@@ -67,15 +67,17 @@ function SuccessContent() {
         </p>
       )}
       
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm justify-center">
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md justify-center">
+        {orderId && (
+          <Link href={`/skating-store/tracking/${orderId}`} className="w-full">
+            <Button size="lg" className="w-full font-bold text-base h-14 rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+              Seguir mi Pedido
+            </Button>
+          </Link>
+        )}
         <Link href="/skating-store/catalogo" className="w-full">
-          <Button size="lg" className="w-full font-bold text-base h-14 rounded-xl">
-            Seguir Comprando
-          </Button>
-        </Link>
-        <Link href="/skating-store" className="w-full">
           <Button variant="outline" size="lg" className="w-full font-bold text-base h-14 rounded-xl">
-            Volver al Inicio
+            Seguir Comprando
           </Button>
         </Link>
       </div>

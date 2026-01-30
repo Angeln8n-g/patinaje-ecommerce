@@ -34,7 +34,7 @@ export function CartItem({ item, editable = true }: CartItemProps) {
       <div className="flex flex-1 items-center justify-between">
         <div className="space-y-2">
           <h3 className="font-semibold text-base line-clamp-2 max-w-[240px] leading-tight">{product.name}</h3>
-          <p className="font-extrabold text-xl">£{product.price.toFixed(2)}</p>
+          <p className="font-extrabold text-xl">${product.price.toFixed(2)}</p>
         </div>
         
         {editable && (

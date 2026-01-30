@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
+import { UserPlus, Mail, Lock } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -23,6 +25,7 @@ const formSchema = z.object({
 
 export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -37,6 +40,7 @@ export default function RegisterPage() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
+    setShouldShake(false);
     try {
       const { error } = await supabase.auth.signUp({
         email: values.email,
@@ -50,6 +54,8 @@ export default function RegisterPage() {
       toast.success("¡Registro exitoso! Por favor inicia sesión.");
       router.push("/login");
     } catch (error: any) {
+      setShouldShake(true);
+      setTimeout(() => setShouldShake(false), 500);
       toast.error(error.message || "Error al registrarse");
     } finally {
       setIsLoading(false);
@@ -58,9 +64,15 @@ export default function RegisterPage() {
 
   return (
     <div className="container max-w-md py-20">
-      <div className="bg-card p-8 rounded-lg border shadow-sm">
+      <div className={cn(
+        "bg-card p-8 rounded-lg border shadow-sm transition-transform",
+        shouldShake && "animate-shake border-destructive shadow-destructive/20"
+      )}>
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Crear Cuenta</h1>
+          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <UserPlus className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold uppercase italic tracking-tighter">Crear Cuenta</h1>
           <p className="text-muted-foreground mt-2">Únete a nuestra comunidad</p>
         </div>
 
@@ -73,7 +85,10 @@ export default function RegisterPage() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="tu@email.com" {...field} />
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="tu@email.com" className="pl-10" {...field} />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -86,7 +101,10 @@ export default function RegisterPage() {
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input type="password" placeholder="******" className="pl-10" {...field} />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -99,13 +117,16 @@ export default function RegisterPage() {
                 <FormItem>
                   <FormLabel>Confirmar Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input type="password" placeholder="******" className="pl-10" {...field} />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full font-black uppercase tracking-widest h-12 rounded-full" disabled={isLoading}>
               {isLoading ? "Cargando..." : "Registrarse"}
             </Button>
           </form>
@@ -114,7 +135,7 @@ export default function RegisterPage() {
         <div className="mt-6 text-center text-sm">
           <p className="text-muted-foreground">
             ¿Ya tienes cuenta?{" "}
-            <Link href="/login" className="text-primary hover:underline font-medium">
+            <Link href="/login" className="text-primary hover:underline font-black uppercase tracking-wider">
               Inicia sesión aquí
             </Link>
           </p>

@@ -55,12 +55,12 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
   };
 
   return (
-    <section className="relative h-[400px] md:h-[500px] w-full overflow-hidden rounded-lg mb-12 group">
+    <section className="relative h-[450px] md:h-[600px] lg:h-[700px] w-full overflow-hidden mb-12 group">
       {/* Slides */}
       {banners.map((banner, index) => (
         <div
           key={banner.id}
-          className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
             index === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
           }`}
         >
@@ -80,28 +80,31 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
                 src={getValidImageUrl(banner.image_url)}
                 alt={banner.title}
                 fill
-                className="object-cover"
+                className="object-cover object-center scale-105 transition-transform duration-[10s] ease-linear"
+                style={{
+                  transform: index === currentIndex ? 'scale(1.1)' : 'scale(1)'
+                }}
                 priority={index === 0}
                 unoptimized={banner.image_url.toLowerCase().endsWith('.gif')}
               />
             )}
-            {/* Overlay */}
-            <div className="absolute inset-0 bg-black/40" />
+            {/* Overlay - Gradient for better text readability */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent md:bg-gradient-to-b md:from-black/40 md:to-black/60" />
           </div>
 
           {/* Content */}
-          <div className="relative z-20 flex flex-col items-center justify-center h-full text-center px-4 max-w-4xl mx-auto text-white">
-            <h2 className="text-4xl md:text-6xl font-extrabold mb-4 tracking-tight drop-shadow-md">
+          <div className="relative z-20 flex flex-col items-center justify-center h-full text-center px-6 max-w-5xl mx-auto text-white">
+            <h2 className="text-5xl md:text-7xl lg:text-8xl font-black mb-6 tracking-tighter drop-shadow-2xl uppercase italic">
               {banner.title}
             </h2>
             {banner.description && (
-              <p className="text-xl md:text-2xl mb-8 drop-shadow-sm max-w-2xl">
+              <p className="text-xl md:text-2xl lg:text-3xl mb-10 drop-shadow-md max-w-3xl font-medium leading-tight text-white/90">
                 {banner.description}
               </p>
             )}
             {banner.link_url && (
               <Link href={banner.link_url}>
-                <Button size="lg" className="text-lg px-8">
+                <Button size="lg" className="text-xl px-12 py-8 rounded-full bg-[#D7F000] text-black hover:bg-white transition-all duration-300 font-black uppercase tracking-widest border-none shadow-[0_0_20px_rgba(215,240,0,0.3)]">
                   Ver Oferta
                 </Button>
               </Link>
@@ -113,30 +116,34 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
       {/* Controls */}
       {banners.length > 1 && (
         <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 text-white hover:bg-black/20 hover:text-white hidden group-hover:flex"
-            onClick={prevSlide}
-          >
-            <ChevronLeft className="h-8 w-8" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 text-white hover:bg-black/20 hover:text-white hidden group-hover:flex"
-            onClick={nextSlide}
-          >
-            <ChevronRight className="h-8 w-8" />
-          </Button>
+          <div className="absolute inset-y-0 left-0 w-24 z-30 flex items-center justify-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-14 w-14 rounded-full bg-black/10 text-white hover:bg-[#D7F000] hover:text-black transition-all duration-300 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+              onClick={prevSlide}
+            >
+              <ChevronLeft className="h-8 w-8" />
+            </Button>
+          </div>
+          <div className="absolute inset-y-0 right-0 w-24 z-30 flex items-center justify-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-14 w-14 rounded-full bg-black/10 text-white hover:bg-[#D7F000] hover:text-black transition-all duration-300 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+              onClick={nextSlide}
+            >
+              <ChevronRight className="h-8 w-8" />
+            </Button>
+          </div>
 
           {/* Indicators */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-3">
             {banners.map((_, index) => (
               <button
                 key={index}
-                className={`w-3 h-3 rounded-full transition-all ${
-                  index === currentIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80"
+                className={`h-1.5 transition-all duration-500 rounded-full ${
+                  index === currentIndex ? "bg-[#D7F000] w-12" : "bg-white/30 w-6 hover:bg-white/60"
                 }`}
                 onClick={() => setCurrentIndex(index)}
               />

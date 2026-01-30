@@ -29,8 +29,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check active sessions and sets the user
     const checkUser = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
         
+        if (error) {
+          console.error("Auth session error:", error);
+          if (error.message.includes("Refresh Token Not Found")) {
+            // Clear everything if the token is invalid
+            await supabase.auth.signOut();
+            setUser(null);
+            setRole(null);
+          }
+          return;
+        }
+
         if (session?.user) {
           setUser(session.user);
           await checkRole(session.user.id);
@@ -51,7 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
+      console.log("Auth event:", event);
+      
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setRole(null);
+        setIsAdmin(false);
+        setIsDelivery(false);
+      } else if (session?.user) {
         setUser(session.user);
         await checkRole(session.user.id);
       } else {

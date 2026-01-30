@@ -2,21 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, updateProfile } from "@/lib/skating-store/supabase-queries";
+import { getProfile, updateProfile, getUserOrders } from "@/lib/skating-store/supabase-queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Save, User as UserIcon, MapPin, Phone } from "lucide-react";
+import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
+import { Order } from "@/types/skating-store";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+
+const STATUS_MAP = {
+  pending: { label: "Pendiente", icon: Clock, color: "bg-amber-100 text-amber-700" },
+  confirmed: { label: "Confirmado", icon: CheckCircle2, color: "bg-blue-100 text-blue-700" },
+  shipped: { label: "En camino", icon: Truck, color: "bg-purple-100 text-purple-700" },
+  delivered: { label: "Entregado", icon: Package, color: "bg-green-100 text-green-700" },
+};
 
 export default function ProfilePage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [changingPassword, setSavingPassword] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
   
   const [formData, setFormData] = useState({
     first_name: "",
@@ -29,6 +43,11 @@ export default function ProfilePage() {
     address_country: ""
   });
 
+  const [passwordData, setPasswordData] = useState({
+    password: "",
+    confirmPassword: ""
+  });
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
@@ -36,7 +55,10 @@ export default function ProfilePage() {
     }
 
     if (user) {
-      loadProfile(user.id);
+      Promise.all([
+        loadProfile(user.id),
+        loadOrders(user.id)
+      ]).finally(() => setLoading(false));
     }
   }, [user, authLoading, router]);
 
@@ -57,8 +79,15 @@ export default function ProfilePage() {
       }
     } catch (error) {
       toast.error("Error al cargar el perfil");
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const loadOrders = async (userId: string) => {
+    try {
+      const data = await getUserOrders(userId);
+      setOrders(data);
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -77,6 +106,28 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordData.password !== passwordData.confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const { error } = await createClient().auth.updateUser({
+        password: passwordData.password
+      });
+      if (error) throw error;
+      toast.success("Contraseña actualizada correctamente");
+      setPasswordData({ password: "", confirmPassword: "" });
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar la contraseña");
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -86,150 +137,207 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container max-w-2xl py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
-        <p className="text-muted-foreground">
-          Administra tu información personal y dirección de envío.
+    <div className="container max-w-5xl py-10">
+      <div className="mb-10">
+        <h1 className="text-4xl font-bold tracking-tight mb-2">Mi Cuenta</h1>
+        <p className="text-muted-foreground text-lg">
+          Gestiona tus pedidos e información personal.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Personal Information */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <UserIcon className="h-4 w-4" />
-              </div>
-              <CardTitle>Información Personal</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Sidebar / Orders List */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <ShoppingBag className="h-4 w-4" />
             </div>
-            <CardDescription>Tu nombre y datos de contacto.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">Nombre</Label>
-                <Input
-                  id="first_name"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  placeholder="Juan"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Apellido</Label>
-                <Input
-                  id="last_name"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  placeholder="Pérez"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="pl-9"
-                  placeholder="+34 600 000 000"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={user?.email || ""} disabled className="bg-muted" />
-              <p className="text-xs text-muted-foreground">El email no se puede cambiar.</p>
-            </div>
-          </CardContent>
-        </Card>
+            <h2 className="text-2xl font-bold">Mis Pedidos</h2>
+          </div>
 
-        {/* Shipping Address */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <MapPin className="h-4 w-4" />
-              </div>
-              <CardTitle>Dirección de Envío</CardTitle>
+          {orders.length === 0 ? (
+            <Card className="border-dashed py-12 text-center">
+              <CardContent className="space-y-4">
+                <ShoppingBag className="h-12 w-12 mx-auto text-muted-foreground opacity-20" />
+                <p className="text-muted-foreground">Aún no has realizado ningún pedido.</p>
+                <Link href="/skating-store/catalogo">
+                  <Button variant="outline">Explorar Catálogo</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {orders.map((order) => {
+                const status = STATUS_MAP[order.status as keyof typeof STATUS_MAP] || STATUS_MAP.pending;
+                const StatusIcon = status.icon;
+                
+                return (
+                  <Card key={order.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0 bg-muted/20">
+                      <div>
+                        <CardTitle className="text-base font-bold">Pedido #{order.id.slice(0, 8).toUpperCase()}</CardTitle>
+                        <CardDescription>{new Date(order.created_at).toLocaleDateString()}</CardDescription>
+                      </div>
+                      <Badge variant="secondary" className={cn("flex items-center gap-1.5 py-1 px-3", status.color)}>
+                        <StatusIcon className="h-3.5 w-3.5" />
+                        {status.label}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="py-4">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-muted-foreground">
+                          {order.items.length} {order.items.length === 1 ? 'producto' : 'productos'} • <span className="font-bold text-foreground">${order.total.toFixed(2)}</span>
+                        </div>
+                        <Link href={`/skating-store/tracking/${order.id}`}>
+                          <Button size="sm" variant="ghost" className="text-primary hover:text-primary hover:bg-primary/5 font-bold">
+                            Rastrear Pedido
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-            <CardDescription>Esta dirección se usará para tus pedidos.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="address">Dirección</Label>
-              <Input
-                id="address"
-                value={formData.address_street}
-                onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
-                placeholder="Calle Principal 123, Piso 4"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="city">Ciudad</Label>
-                <Input
-                  id="city"
-                  value={formData.address_city}
-                  onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
-                  placeholder="Madrid"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">Provincia/Estado</Label>
-                <Input
-                  id="state"
-                  value={formData.address_state}
-                  onChange={(e) => setFormData({ ...formData, address_state: e.target.value })}
-                  placeholder="Madrid"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="postal_code">Código Postal</Label>
-                <Input
-                  id="postal_code"
-                  value={formData.address_postal_code}
-                  onChange={(e) => setFormData({ ...formData, address_postal_code: e.target.value })}
-                  placeholder="28001"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country">País</Label>
-                <Input
-                  id="country"
-                  value={formData.address_country}
-                  onChange={(e) => setFormData({ ...formData, address_country: e.target.value })}
-                  placeholder="España"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end">
-          <Button type="submit" size="lg" disabled={saving} className="min-w-[150px]">
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Guardar Cambios
-              </>
-            )}
-          </Button>
+          )}
         </div>
-      </form>
+
+        {/* Profile Settings */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <UserIcon className="h-4 w-4" />
+            </div>
+            <h2 className="text-2xl font-bold">Información</h2>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Datos Personales</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="first_name" className="text-xs">Nombre</Label>
+                    <Input
+                      id="first_name"
+                      value={formData.first_name}
+                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="last_name" className="text-xs">Apellido</Label>
+                    <Input
+                      id="last_name"
+                      value={formData.last_name}
+                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="text-xs">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Dirección</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="address" className="text-xs">Calle y Número</Label>
+                  <Input
+                    id="address"
+                    value={formData.address_street}
+                    onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="city" className="text-xs">Ciudad</Label>
+                    <Input
+                      id="city"
+                      value={formData.address_city}
+                      onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="postal_code" className="text-xs">C.P.</Label>
+                    <Input
+                      id="postal_code"
+                      value={formData.address_postal_code}
+                      onChange={(e) => setFormData({ ...formData, address_postal_code: e.target.value })}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="pt-2 border-t bg-muted/5">
+                <Button type="submit" size="sm" className="w-full font-bold" disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Guardar Cambios</>}
+                </Button>
+              </CardFooter>
+            </Card>
+          </form>
+
+          <div className="flex items-center gap-2 mb-2 pt-4">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <Lock className="h-4 w-4" />
+            </div>
+            <h2 className="text-2xl font-bold">Seguridad</h2>
+          </div>
+
+          <form onSubmit={handlePasswordSubmit} className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Cambiar Contraseña</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new_password" className="text-xs">Nueva Contraseña</Label>
+                  <Input
+                    id="new_password"
+                    type="password"
+                    value={passwordData.password}
+                    onChange={(e) => setPasswordData({ ...passwordData, password: e.target.value })}
+                    className="h-9"
+                    placeholder="******"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm_password" className="text-xs">Confirmar Contraseña</Label>
+                  <Input
+                    id="confirm_password"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="h-9"
+                    placeholder="******"
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="pt-2 border-t bg-muted/5">
+                <Button type="submit" size="sm" variant="outline" className="w-full font-bold" disabled={changingPassword}>
+                  {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : "Actualizar Contraseña"}
+                </Button>
+              </CardFooter>
+            </Card>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

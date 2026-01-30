@@ -26,7 +26,7 @@ export default async function HomePage() {
 
       {/* Dynamic Banners (if any) - Optional / Secondary */}
       {banners.length > 0 && (
-        <div className="container mx-auto px-4">
+        <div className="w-full">
            <PromoCarousel banners={banners} />
         </div>
       )}

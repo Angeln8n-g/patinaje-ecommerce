@@ -62,9 +62,9 @@ export function ProductCard({ product }: ProductCardProps) {
           <h3 className="font-bold text-base line-clamp-2 mb-2 min-h-[3rem]">{product.name}</h3>
           
           <div className="flex items-baseline gap-2">
-            <span className="font-extrabold text-lg">£{product.price.toFixed(2)}</span>
+            <span className="font-extrabold text-lg">${product.price.toFixed(2)}</span>
             <span className="text-sm text-muted-foreground line-through decoration-muted-foreground/50">
-              £{previousPrice.toFixed(2)}
+              ${previousPrice.toFixed(2)}
             </span>
           </div>
         </CardContent>

@@ -305,6 +305,21 @@ export async function getProfile(userId: string) {
   return data;
 }
 
+export async function getUserOrders(userId: string) {
+  const { data, error } = await supabase
+    .from('skating_orders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching user orders:', error);
+    return [];
+  }
+
+  return (data || []).map(mapDbOrderToOrder);
+}
+
 export async function updateProfile(userId: string, updates: any) {
   const { data, error } = await supabase
     .from('profiles')

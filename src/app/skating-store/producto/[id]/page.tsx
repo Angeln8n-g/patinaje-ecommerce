@@ -47,9 +47,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
 
           <div className="flex items-center gap-3 mb-2">
-            <div className="text-4xl font-extrabold">£{product.price.toFixed(2)}</div>
+            <div className="text-4xl font-extrabold">${product.price.toFixed(2)}</div>
             <div className="flex items-center gap-1 text-muted-foreground text-sm">
-              <span>from £{(product.price / 12).toFixed(0)} per month</span>
+              <span>from ${(product.price / 12).toFixed(0)} per month</span>
               <Info className="h-4 w-4" />
             </div>
           </div>
