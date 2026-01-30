@@ -3,6 +3,8 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
+  icon_name?: string;
+  icon_url?: string;
   created_at: string;
 }
 
@@ -42,11 +44,27 @@ export interface Product {
   description: string;
   price: number;
   category: ProductCategory;
+  subcategory?: string;
   images: string[];
   stock: number;
   featured: boolean;
+  barcode?: string;
+  unit_type?: string;
+  supplier?: string;
+  purchase_price?: number;
+  status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  product_id: string;
+  user_id: string;
+  quantity_change: number;
+  movement_type: 'in' | 'out' | 'adjustment';
+  reason?: string;
+  created_at: string;
 }
 
 export interface CartItem {
@@ -69,6 +87,9 @@ export interface Order {
   shipping: ShippingInfo;
   total: number;
   status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
+  payment_method: 'card' | 'cash';
+  payment_status: 'pending' | 'paid' | 'failed';
+  qr_token?: string;
   created_at: string;
 }
 

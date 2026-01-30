@@ -4,10 +4,15 @@ import { Shipment, ShipmentStatus } from "@/types/skating-store";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Phone, Package, Navigation } from "lucide-react";
+import { MapPin, Phone, Package, Navigation, QrCode, Banknote, CheckCircle2 } from "lucide-react";
 import { updateShipmentStatus } from "@/lib/skating-store/delivery-actions";
+import { confirmCashPayment } from "@/lib/skating-store/supabase-queries";
 import { toast } from "sonner";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { BarcodeScanner } from "@/components/admin/BarcodeScanner";
+import { cn } from "@/lib/utils";
+import { mapDbOrderToOrder } from "@/lib/skating-store/supabase-queries";
 
 interface ShipmentCardProps {
   shipment: any; // Using any for now to handle joined data easily
@@ -16,8 +21,20 @@ interface ShipmentCardProps {
 
 export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const order = shipment.order;
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  
+  // Robust data handling
+  const rawOrder = shipment.order;
+  if (!rawOrder) return null; // Or some fallback UI
+
+  // Ensure order is mapped correctly even if it comes from different sources
+  const order = rawOrder.shipping ? rawOrder : mapDbOrderToOrder(rawOrder);
   const shipping = order.shipping;
+
+  if (!shipping) {
+    console.error("Shipping info missing for order:", order.id);
+    return null;
+  }
 
   const handleStatusUpdate = async (newStatus: ShipmentStatus) => {
     setIsLoading(true);
@@ -46,6 +63,27 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
     }
   };
 
+  const handleQrScan = async (decodedText: string) => {
+    try {
+      const data = JSON.parse(decodedText);
+      if (data.orderId !== order.id) {
+        toast.error("El código QR no pertenece a este pedido");
+        return;
+      }
+      
+      setIsLoading(true);
+      await confirmCashPayment(data.orderId, data.qrToken);
+      toast.success("Pago confirmado y pedido entregado");
+      setIsScannerOpen(false);
+      onUpdate();
+    } catch (e) {
+      console.error(e);
+      toast.error("Código QR inválido o error al procesar el pago");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getStatusColor = (status: ShipmentStatus) => {
     switch (status) {
       case 'ASIGNADO': return 'secondary';
@@ -61,69 +99,145 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
   };
 
-  return (
-    <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg">Pedido #{order.id.slice(0, 8)}</CardTitle>
-          <Badge variant={getStatusColor(shipment.status) as any}>{shipment.status}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div className="flex items-start gap-2">
-          <UsersIcon className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <p className="font-medium">{shipping.fullName}</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <p>{shipping.address}</p>
-            <p className="text-muted-foreground">{shipping.city}, {shipping.postalCode}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Phone className="h-4 w-4 text-muted-foreground" />
-          <a href={`tel:${shipping.phone}`} className="text-blue-600 hover:underline">
-            {shipping.phone}
-          </a>
-        </div>
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-muted-foreground" />
-          <span>{order.items.length} items - ${order.total}</span>
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col gap-2">
-        <Button variant="outline" className="w-full" onClick={openMap}>
-          <Navigation className="mr-2 h-4 w-4" />
-          Abrir Mapa
-        </Button>
-        
-        {shipment.status === 'ASIGNADO' && (
-          <Button className="w-full" onClick={() => handleStatusUpdate('EN_RUTA')} disabled={isLoading}>
-            Iniciar Ruta
-          </Button>
-        )}
-        
-        {shipment.status === 'EN_RUTA' && (
-          <div className="grid grid-cols-2 gap-2 w-full">
-            <Button variant="secondary" onClick={() => handleStatusUpdate('CERCA')} disabled={isLoading}>
-              Cerca
-            </Button>
-            <Button onClick={() => handleStatusUpdate('ENTREGADO')} disabled={isLoading}>
-              Entregado
-            </Button>
-          </div>
-        )}
+  const isCashOrder = order.payment_method === 'cash';
+  const isPendingPayment = order.payment_status === 'pending';
+  const isHistory = shipment.status === 'ENTREGADO';
 
-        {shipment.status === 'CERCA' && (
-          <Button className="w-full" onClick={() => handleStatusUpdate('ENTREGADO')} disabled={isLoading}>
-            Confirmar Entrega
-          </Button>
+  return (
+    <>
+      <Card className={cn("mb-4 overflow-hidden border-none shadow-md transition-all hover:shadow-lg", isHistory && "opacity-80")}>
+        <CardHeader className={cn("pb-2", isHistory ? "bg-muted/30" : "bg-primary/5")}>
+          <div className="flex justify-between items-start">
+            <div className="flex flex-col gap-1">
+              <CardTitle className="text-lg font-bold tracking-tight">Pedido #{order.id.slice(0, 8)}</CardTitle>
+              {isHistory && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+                  <CheckCircle2 className="h-3 w-3 text-green-600" />
+                  ENTREGADO EL {new Date(shipment.updated_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <Badge variant={getStatusColor(shipment.status) as any} className="shadow-sm">{shipment.status}</Badge>
+          </div>
+          {isCashOrder && (
+            <div className={cn(
+              "flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md mt-2 w-fit uppercase tracking-wider shadow-sm",
+              order.payment_status === 'paid' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+            )}>
+              <Banknote className="h-3.5 w-3.5" />
+              {order.payment_status === 'paid' ? 'PAGADO EN EFECTIVO' : 'COBRO EN EFECTIVO PENDIENTE'}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4 text-sm">
+          <div className="grid grid-cols-1 gap-3">
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center shrink-0">
+                <UsersIcon className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-0.5">Cliente</p>
+                <p className="font-semibold text-base">{shipping.fullName}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center shrink-0">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-0.5">Dirección de Entrega</p>
+                <p className="font-medium leading-tight">{shipping.address}</p>
+                <p className="text-muted-foreground text-xs">{shipping.city}, {shipping.postalCode}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-dashed">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary" />
+              <a href={`tel:${shipping.phone}`} className="font-bold text-primary hover:underline">
+                {shipping.phone}
+              </a>
+            </div>
+            <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-full">
+              <Package className="h-4 w-4 text-primary" />
+              <span className="font-black text-primary text-base">
+                ${order.total}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+        {!isHistory && (
+          <CardFooter className="flex flex-col gap-2 pt-0 pb-4 px-6">
+            <Button variant="outline" className="w-full h-11 rounded-xl font-bold border-2 hover:bg-muted" onClick={openMap}>
+              <Navigation className="mr-2 h-4 w-4" />
+              Abrir en Google Maps
+            </Button>
+            
+            {shipment.status === 'ASIGNADO' && (
+              <Button className="w-full h-11 rounded-xl font-bold shadow-lg shadow-primary/20" onClick={() => handleStatusUpdate('EN_RUTA')} disabled={isLoading}>
+                Comenzar Entrega
+              </Button>
+            )}
+            
+            {shipment.status === 'EN_RUTA' && (
+              <div className="grid grid-cols-2 gap-2 w-full">
+                <Button variant="secondary" className="h-11 rounded-xl font-bold" onClick={() => handleStatusUpdate('CERCA')} disabled={isLoading}>
+                  Estoy Cerca
+                </Button>
+                {isCashOrder && isPendingPayment ? (
+                  <Button onClick={() => setIsScannerOpen(true)} className="h-11 rounded-xl font-bold bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-200">
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Cobrar QR
+                  </Button>
+                ) : (
+                  <Button className="h-11 rounded-xl font-bold shadow-lg shadow-primary/20" onClick={() => handleStatusUpdate('ENTREGADO')} disabled={isLoading}>
+                    Entregado
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {shipment.status === 'CERCA' && (
+              <>
+                {isCashOrder && isPendingPayment ? (
+                  <Button onClick={() => setIsScannerOpen(true)} className="w-full h-11 rounded-xl font-bold bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-200">
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Confirmar Cobro con QR
+                  </Button>
+                ) : (
+                  <Button className="w-full h-11 rounded-xl font-bold shadow-lg shadow-primary/20" onClick={() => handleStatusUpdate('ENTREGADO')} disabled={isLoading}>
+                    Confirmar Entrega
+                  </Button>
+                )}
+              </>
+            )}
+          </CardFooter>
         )}
-      </CardFooter>
-    </Card>
+      </Card>
+
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Escanear QR de Cliente</DialogTitle>
+            <DialogDescription>
+              Escanea el código QR del cliente para confirmar la recepción del efectivo y completar el pedido.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <BarcodeScanner onScan={handleQrScan} autoStart={true} />
+          </div>
+          <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-amber-600" />
+              <span className="font-semibold text-lg">Monto a Cobrar:</span>
+            </div>
+            <span className="text-2xl font-bold text-primary">${order.total}</span>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ShippingInfo } from "@/types/skating-store";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button as UIButton } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { CreditCard, Banknote } from "lucide-react";
 
 const formSchema = z.object({
   fullName: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -14,27 +19,42 @@ const formSchema = z.object({
   city: z.string().min(2, "La ciudad es requerida"),
   postalCode: z.string().regex(/^\d{5}$/, "Código postal inválido (5 dígitos)"),
   phone: z.string().min(9, "Teléfono inválido"),
+  paymentMethod: z.enum(["card", "cash"]),
 });
 
 interface CheckoutFormProps {
-  onSubmit: (data: ShippingInfo) => Promise<void>;
+  onSubmit: (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }) => Promise<void>;
   isLoading: boolean;
+  initialValues?: Partial<ShippingInfo>;
+  disabled?: boolean;
+  onLogin?: () => void;
 }
 
-export function CheckoutForm({ onSubmit, isLoading }: CheckoutFormProps) {
+export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onLogin }: CheckoutFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullName: "",
-      address: "",
-      city: "",
-      postalCode: "",
-      phone: "",
+      fullName: initialValues?.fullName || "",
+      address: initialValues?.address || "",
+      city: initialValues?.city || "",
+      postalCode: initialValues?.postalCode || "",
+      phone: initialValues?.phone || "",
+      paymentMethod: "card",
     },
   });
 
   return (
     <Form {...form}>
+      <div className="space-y-4">
+        {disabled && (
+          <Alert>
+            <AlertTitle>Inicia sesión para continuar</AlertTitle>
+            <AlertDescription>
+              Debes iniciar sesión para confirmar el pedido. Puedes iniciar sesión y volver, los datos se autocompletarán.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
@@ -43,7 +63,7 @@ export function CheckoutForm({ onSubmit, isLoading }: CheckoutFormProps) {
             <FormItem>
               <FormLabel>Nombre Completo</FormLabel>
               <FormControl>
-                <Input placeholder="Juan Pérez" {...field} />
+                <Input placeholder="Juan Pérez" {...field} disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -56,7 +76,7 @@ export function CheckoutForm({ onSubmit, isLoading }: CheckoutFormProps) {
             <FormItem>
               <FormLabel>Dirección</FormLabel>
               <FormControl>
-                <Input placeholder="Calle 123" {...field} />
+                <Input placeholder="Calle 123" {...field} disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -70,7 +90,7 @@ export function CheckoutForm({ onSubmit, isLoading }: CheckoutFormProps) {
               <FormItem>
                 <FormLabel>Ciudad</FormLabel>
                 <FormControl>
-                  <Input placeholder="Madrid" {...field} />
+                  <Input placeholder="Madrid" {...field} disabled={disabled} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -83,7 +103,7 @@ export function CheckoutForm({ onSubmit, isLoading }: CheckoutFormProps) {
               <FormItem>
                 <FormLabel>Código Postal</FormLabel>
                 <FormControl>
-                  <Input placeholder="28001" {...field} />
+                  <Input placeholder="28001" {...field} disabled={disabled} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -97,16 +117,79 @@ export function CheckoutForm({ onSubmit, isLoading }: CheckoutFormProps) {
             <FormItem>
               <FormLabel>Teléfono</FormLabel>
               <FormControl>
-                <Input placeholder="+34 600 000 000" {...field} />
+                <Input placeholder="+34 600 000 000" {...field} disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        
-        <Button type="submit" className="w-full mt-6" size="lg" disabled={isLoading}>
-          {isLoading ? "Procesando..." : "Confirmar Pedido"}
-        </Button>
+
+        <div className="pt-4 border-t">
+          <h3 className="text-lg font-semibold mb-4">Método de Pago</h3>
+          <FormField
+            control={form.control}
+            name="paymentMethod"
+            render={({ field }) => (
+              <FormItem className="space-y-3">
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="grid grid-cols-1 gap-4"
+                    disabled={disabled}
+                  >
+                    <FormItem>
+                      <FormControl>
+                        <RadioGroupItem value="card" id="card" className="peer sr-only" />
+                      </FormControl>
+                      <Label
+                        htmlFor="card"
+                        className="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5" />
+                          <div>
+                            <p className="font-medium">Tarjeta de Crédito / Débito</p>
+                            <p className="text-xs text-muted-foreground">Pago seguro online</p>
+                          </div>
+                        </div>
+                      </Label>
+                    </FormItem>
+                    <FormItem>
+                      <FormControl>
+                        <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
+                      </FormControl>
+                      <Label
+                        htmlFor="cash"
+                        className="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Banknote className="h-5 w-5" />
+                          <div>
+                            <p className="font-medium">Efectivo al recibir</p>
+                            <p className="text-xs text-muted-foreground">Paga cuando recibas tu pedido</p>
+                          </div>
+                        </div>
+                      </Label>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {!disabled && (
+          <Button type="submit" className="w-full mt-6" size="lg" disabled={isLoading}>
+            {isLoading ? "Procesando..." : "Confirmar Pedido"}
+          </Button>
+        )}
+        {disabled && (
+          <UIButton type="button" className="w-full mt-6" size="lg" onClick={onLogin}>
+            Iniciar Sesión
+          </UIButton>
+        )}
       </form>
     </Form>
   );

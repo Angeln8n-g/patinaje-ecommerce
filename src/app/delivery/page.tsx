@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from "react";
 import { getDeliveryShipments, updateDeliveryLocation } from "@/lib/skating-store/delivery-actions";
 import { ShipmentCard } from "@/components/delivery/ShipmentCard";
-import { Loader2 } from "lucide-react";
+import { Loader2, Package, Truck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { mapDbOrderToOrder } from "@/lib/skating-store/supabase-queries";
 import {
   Dialog,
   DialogContent,
@@ -118,18 +119,29 @@ export default function DeliveryDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Mis Envíos</h2>
-        <span className="text-sm text-muted-foreground">{shipments.length} activos</span>
+    <div className="space-y-6 pb-8">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <Truck className="h-5 w-5" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">Mis Envíos</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {shipments.length === 0 
+            ? "No tienes entregas pendientes" 
+            : `Tienes ${shipments.length} ${shipments.length === 1 ? 'entrega pendiente' : 'entregas pendientes'}`}
+        </p>
       </div>
 
       {shipments.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground bg-card rounded-lg border">
-          <p>No tienes envíos asignados en este momento.</p>
+        <div className="text-center py-20 text-muted-foreground bg-card rounded-2xl border border-dashed shadow-sm">
+          <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="font-medium">¡Buen trabajo! Estás al día con tus repartos.</p>
+          <p className="text-xs mt-1">Los nuevos pedidos aparecerán aquí automáticamente.</p>
         </div>
       ) : (
-        <div>
+        <div className="space-y-4">
           {shipments.map((shipment) => (
             <ShipmentCard 
               key={shipment.id} 
@@ -151,8 +163,15 @@ export default function DeliveryDashboard() {
           {newOrderData && (
              <div className="py-4">
                 <p className="font-bold text-lg">Pedido #{newOrderData.order?.id?.slice(0, 8)}</p>
-                <p>{newOrderData.order?.shipping?.address}</p>
-                <p>{newOrderData.order?.shipping?.city}</p>
+                {(() => {
+                  const order = newOrderData.order?.shipping ? newOrderData.order : mapDbOrderToOrder(newOrderData.order);
+                  return (
+                    <>
+                      <p>{order?.shipping?.address}</p>
+                      <p>{order?.shipping?.city}</p>
+                    </>
+                  );
+                })()}
              </div>
           )}
           <Button onClick={() => setNewOrderPopupOpen(false)}>Entendido</Button>

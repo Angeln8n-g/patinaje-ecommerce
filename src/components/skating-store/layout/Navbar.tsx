@@ -2,14 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image"; // Import Image
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { CartIcon } from "./CartIcon";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFavorites } from "@/contexts/FavoritesContext";
-import { getProfile } from "@/lib/skating-store/supabase-queries";
-import { Button } from "@/components/ui/button";
+import { getProfile, getStaticContentClient } from "@/lib/skating-store/supabase-queries";
 import { Input } from "@/components/ui/input";
-import { User, LogOut, LayoutDashboard, Search, Heart, MapPin, Bell, Trash2, Settings } from "lucide-react"; // Import Trash2
+import { User, LogOut, LayoutDashboard, Search, Menu, Mail, Info, Truck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,19 +17,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea for favorites list
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 export function Navbar() {
-  const { user, isAdmin, signOut } = useAuth();
-  const { favorites, removeFavorite } = useFavorites(); // Get removeFavorite
+  const { user, isAdmin, isDelivery, signOut } = useAuth();
   const [address, setAddress] = React.useState("Dirección no configurada");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [storeTitle, setStoreTitle] = React.useState("Skating Store");
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
+  const router = useRouter();
+  const [isClient, setIsClient] = React.useState(false);
 
   const handleCartClick = () => {
     const event = new CustomEvent('open-cart');
     window.dispatchEvent(event);
   };
 
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      router.push(`/skating-store/catalogo?search=${encodeURIComponent(searchTerm)}`);
+    }
+  };
+
   React.useEffect(() => {
+    setIsClient(true);
     if (user) {
       getProfile(user.id).then((profile) => {
         if (profile?.address_street) {
@@ -40,11 +50,27 @@ export function Navbar() {
         }
       });
     }
+    getStaticContentClient('site-settings').then((settings) => {
+      const data = settings?.data || {};
+      // @ts-ignore - Supabase JSON type inference issue
+      if (data.store_title) setStoreTitle(data.store_title as string);
+      // @ts-ignore - Supabase JSON type inference issue
+      if (data.logo_url) setLogoUrl(data.logo_url as string);
+    });
   }, [user]);
+
+  if (!isClient) {
+      // Return a skeleton or minimal structure during SSR to match initial hydration
+      return (
+        <div className="border-b bg-background sticky top-0 z-50 h-[120px]">
+          {/* Optional: Add skeleton loading state here if needed */}
+        </div>
+      );
+  }
 
   return (
     <div className="border-b bg-background sticky top-0 z-50">
-      {/* Top Bar for Address - Desktop only - Matches Design */}
+      {/* Top Bar for Address - Desktop only */}
       <div className={`bg-secondary/30 text-xs py-3 px-4 border-b hidden md:block transition-all duration-300 ${!user ? 'h-0 py-0 border-none overflow-hidden' : ''}`}>
         <div className="container mx-auto flex justify-between items-center">
           <Link href="/skating-store/perfil" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -67,45 +93,120 @@ export function Navbar() {
         </div>
       </div>
 
-      <div className="flex h-20 items-center px-4 container mx-auto gap-8">
-        {/* Logo */}
+      <div className="flex h-20 items-center px-4 container mx-auto gap-4 md:gap-8 justify-between">
+        {/* Mobile Menu Trigger */}
+        <div className="md:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <div className="p-2 -ml-2 cursor-pointer">
+                <Menu className="h-6 w-6" />
+              </div>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[300px] sm:w-[400px]">
+              <div className="sr-only">
+                <SheetTitle>Menú de navegación</SheetTitle>
+                <SheetDescription>
+                  Menú principal para navegar por las secciones de la tienda
+                </SheetDescription>
+              </div>
+              <div className="flex flex-col gap-6 mt-6">
+                <div className="flex items-center gap-2">
+                  {logoUrl ? (
+                    <Image src={logoUrl} alt="Logo" width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center">
+                      <span className="font-bold text-lg text-primary-foreground">S</span>
+                    </div>
+                  )}
+                  <span className="text-xl font-bold">{storeTitle}</span>
+                </div>
+                
+                {user && (
+                  <div className="bg-secondary/30 p-4 rounded-lg">
+                    <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Dirección de entrega</p>
+                    <p className="text-sm">{address}</p>
+                  </div>
+                )}
+
+                <nav className="flex flex-col gap-4">
+                  <Link href="/skating-store" className="flex items-center gap-2 text-lg font-medium">
+                    <LayoutDashboard className="h-5 w-5" /> Inicio
+                  </Link>
+                  <Link href="/skating-store/catalogo" className="flex items-center gap-2 text-lg font-medium">
+                    <Search className="h-5 w-5" /> Catálogo
+                  </Link>
+                  <Link href="/skating-store/sobre-nosotros" className="flex items-center gap-2 text-lg font-medium">
+                    <Info className="h-5 w-5" /> Sobre Nosotros
+                  </Link>
+                  <Link href="/skating-store/contacto" className="flex items-center gap-2 text-lg font-medium">
+                    <Mail className="h-5 w-5" /> Contacto
+                  </Link>
+                  {isDelivery && (
+                    <Link href="/delivery" className="flex items-center gap-2 text-lg font-medium text-primary">
+                      <Truck className="h-5 w-5" /> Panel de Reparto
+                    </Link>
+                  )}
+                  {isAdmin && (
+                    <Link href="/admin" className="flex items-center gap-2 text-lg font-medium text-primary">
+                      <LayoutDashboard className="h-5 w-5" /> Panel Admin
+                    </Link>
+                  )}
+                </nav>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        {/* Logo - Centered on mobile if desired, or left aligned */}
         <Link href="/skating-store" className="flex items-center space-x-2 shrink-0">
-          <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center">
-            <span className="font-bold text-lg text-primary-foreground">S</span>
-          </div>
-          <span className="text-xl font-bold hidden sm:inline-block">Skating Store</span>
+          {logoUrl ? (
+            <Image src={logoUrl} alt="Logo" width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
+          ) : (
+            <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center">
+              <span className="font-bold text-lg text-primary-foreground">S</span>
+            </div>
+          )}
+          <span className="text-xl font-bold inline-block">{storeTitle}</span>
         </Link>
 
-        {/* Search Bar */}
+        {/* Search Bar - Hidden on Mobile initially or icon only */}
         <div className="flex-1 max-w-xl relative hidden md:block">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             placeholder="Search the entire shop" 
             className="pl-12 rounded-2xl bg-secondary border-none h-12 focus-visible:ring-primary shadow-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleSearch}
           />
         </div>
 
         {/* Navigation Actions */}
-        <div className="ml-auto flex items-center space-x-2 sm:space-x-4">
-          <Link href="/skating-store" className="flex flex-col items-center gap-1 group">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <Link href="/skating-store" className="flex flex-col items-center gap-1 group hidden md:flex">
              <div className="h-8 w-8 flex items-center justify-center text-primary">
                <LayoutDashboard className="h-6 w-6" /> 
              </div>
              <span className="text-[10px] font-bold">Home</span>
           </Link>
 
-          <Link href="/skating-store/catalogo" className="flex flex-col items-center gap-1 group opacity-60 hover:opacity-100 transition-opacity">
+          <Link href="/skating-store/catalogo" className="flex flex-col items-center gap-1 group opacity-60 hover:opacity-100 transition-opacity hidden md:flex">
              <div className="h-8 w-8 flex items-center justify-center">
                <Search className="h-6 w-6" /> 
              </div>
              <span className="text-[10px] font-bold">Catalog</span>
           </Link>
 
+          {/* Search Icon Mobile */}
+          <div className="md:hidden flex items-center justify-center h-10 w-10" onClick={() => router.push('/skating-store/catalogo')}>
+             <Search className="h-6 w-6" />
+          </div>
+
           <div className="flex flex-col items-center gap-1 group opacity-60 hover:opacity-100 transition-opacity cursor-pointer" onClick={handleCartClick}>
              <div className="h-8 w-8 flex items-center justify-center relative">
                <CartIcon className="hover:bg-transparent" /> 
              </div>
-             <span className="text-[10px] font-bold">Cart</span>
+             <span className="text-[10px] font-bold hidden md:inline">Cart</span>
           </div>
 
           {user ? (
@@ -115,7 +216,7 @@ export function Navbar() {
                    <div className="h-8 w-8 flex items-center justify-center">
                      <User className="h-6 w-6" /> 
                    </div>
-                   <span className="text-[10px] font-bold">Profile</span>
+                   <span className="text-[10px] font-bold hidden md:inline">Profile</span>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -123,7 +224,7 @@ export function Navbar() {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none truncate">{user.email}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {isAdmin ? 'Administrador' : 'Usuario'}
+                      {isAdmin ? 'Administrador' : isDelivery ? 'Repartidor' : 'Usuario'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -134,6 +235,14 @@ export function Navbar() {
                     Mi Perfil
                   </Link>
                 </DropdownMenuItem>
+                {isDelivery && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/delivery">
+                      <Truck className="mr-2 h-4 w-4" />
+                      Panel de Reparto
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 {isAdmin && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin">
@@ -153,7 +262,7 @@ export function Navbar() {
                <div className="h-8 w-8 flex items-center justify-center">
                  <User className="h-6 w-6" /> 
                </div>
-               <span className="text-[10px] font-bold">Log In</span>
+               <span className="text-[10px] font-bold hidden md:inline">Log In</span>
             </Link>
           )}
         </div>

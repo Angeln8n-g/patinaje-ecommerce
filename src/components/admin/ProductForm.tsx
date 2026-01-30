@@ -60,6 +60,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       const productData = {
         ...values,
         images: [values.images], // Wrap in array
+        status: (initialData?.status || 'active') as 'active' | 'inactive',
       };
 
       if (initialData) {

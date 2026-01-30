@@ -30,6 +30,11 @@ export default function PagesAdmin() {
     phone: "",
     email: ""
   });
+  
+  const [siteSettings, setSiteSettings] = useState({
+    store_title: "",
+    logo_url: ""
+  });
 
   useEffect(() => {
     loadData();
@@ -38,13 +43,15 @@ export default function PagesAdmin() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [about, contact] = await Promise.all([
+      const [about, contact, settings] = await Promise.all([
         getStaticContent("about-us"),
-        getStaticContent("contact-info")
+        getStaticContent("contact-info"),
+        getStaticContent("site-settings")
       ]);
 
       if (about) setAboutData(about.data);
       if (contact) setContactData(contact.data);
+      if (settings) setSiteSettings(settings.data);
     } catch (error) {
       toast.error("Error al cargar contenido");
     } finally {
@@ -75,6 +82,18 @@ export default function PagesAdmin() {
       setSaving(false);
     }
   };
+  
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      await updateStaticContent("site-settings", siteSettings);
+      toast.success("Configuración de la página actualizada");
+    } catch (error) {
+      toast.error("Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
@@ -87,15 +106,16 @@ export default function PagesAdmin() {
       </div>
 
       <Tabs defaultValue="about" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+        <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
           <TabsTrigger value="about">Sobre Nosotros</TabsTrigger>
           <TabsTrigger value="contact">Contacto</TabsTrigger>
+          <TabsTrigger value="settings">Configuración</TabsTrigger>
         </TabsList>
 
         <TabsContent value="about" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Editar "Sobre Nosotros"</CardTitle>
+              <CardTitle>Editar Sobre Nosotros</CardTitle>
               <CardDescription>Gestiona el contenido de la página de historia y misión.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -158,7 +178,7 @@ export default function PagesAdmin() {
         <TabsContent value="contact" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Editar "Contacto"</CardTitle>
+              <CardTitle>Editar Contacto</CardTitle>
               <CardDescription>Actualiza la información de contacto mostrada a los clientes.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -195,6 +215,37 @@ export default function PagesAdmin() {
               </div>
 
               <Button onClick={handleSaveContact} disabled={saving} className="w-full">
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar Cambios
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="settings" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de la Página</CardTitle>
+              <CardDescription>Edita el título mostrado en la tienda y la imagen del logo.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Título de la Tienda</Label>
+                <Input 
+                  value={siteSettings.store_title} 
+                  onChange={(e) => setSiteSettings({ ...siteSettings, store_title: e.target.value })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>URL del Logo</Label>
+                <Input 
+                  value={siteSettings.logo_url} 
+                  onChange={(e) => setSiteSettings({ ...siteSettings, logo_url: e.target.value })}
+                />
+              </div>
+              
+              <Button onClick={handleSaveSettings} disabled={saving} className="w-full">
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Guardar Cambios
               </Button>

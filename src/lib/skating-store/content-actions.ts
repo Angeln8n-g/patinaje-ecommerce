@@ -28,13 +28,41 @@ export async function createCategory(category: Omit<Category, "id" | "created_at
   
   // Double check admin role via DB just in case, though RLS handles it
   
-  const { data, error } = await supabase
+  const payload: any = {
+    name: (category as any).name,
+    slug: (category as any).slug,
+    description: (category as any).description ?? null,
+  };
+  if (typeof (category as any).icon_name !== "undefined") {
+    payload.icon_name = (category as any).icon_name || null;
+  }
+  if (typeof (category as any).icon_url !== "undefined") {
+    payload.icon_url = (category as any).icon_url || null;
+  }
+
+  let { data, error } = await supabase
     .from("categories")
-    .insert([category])
+    .insert([payload])
     .select()
     .single();
 
   if (error) {
+    const msg = String((error as any)?.message || "");
+    const code = String((error as any)?.code || "");
+    if (code === "PGRST204" || msg.includes("icon_name") || msg.includes("icon_url")) {
+      delete payload.icon_name;
+      delete payload.icon_url;
+      const retry = await supabase
+        .from("categories")
+        .insert([payload])
+        .select()
+        .single();
+      data = retry.data as any;
+      error = retry.error as any;
+      if (!error) {
+        return { success: true, data };
+      }
+    }
     console.error("Error creating category:", error);
     throw new Error("Failed to create category");
   }
@@ -174,8 +202,7 @@ export async function updateStaticContent(slug: string, data: any) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("static_content")
-    .update({ data, updated_at: new Date().toISOString() })
-    .eq("slug", slug);
+    .upsert({ slug, data, updated_at: new Date().toISOString() }, { onConflict: "slug" });
 
   if (error) throw new Error("Failed to update static content");
   return { success: true };

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { Shipment, ShipmentStatus } from "@/types/skating-store";
+import { mapDbOrderToOrder } from "./supabase-queries";
 
 export async function assignShipment(orderId: string, deliveryManId: string) {
   const supabase = await createClient();
@@ -125,7 +126,36 @@ export async function getDeliveryShipments() {
     return [];
   }
 
-  return data;
+  return data.map((shipment: any) => ({
+    ...shipment,
+    order: mapDbOrderToOrder(shipment.order)
+  }));
+}
+
+export async function getDeliveryHistory() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("shipments")
+    .select(`
+      *,
+      order:skating_orders (*)
+    `)
+    .eq("delivery_man_id", user.id)
+    .eq("status", "ENTREGADO")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching delivery history:", error);
+    return [];
+  }
+
+  return data.map((shipment: any) => ({
+    ...shipment,
+    order: mapDbOrderToOrder(shipment.order)
+  }));
 }
 
 export async function getAllDeliveryMen() {
@@ -206,7 +236,7 @@ export async function getAllOrdersWithShipment() {
   // Transform data to make shipment an object instead of array if needed
   // Supabase join returns array for 1:M, even if it's logically 1:1
   const transformedData = data.map((order: any) => ({
-    ...order,
+    ...mapDbOrderToOrder(order),
     shipment: order.shipment && Array.isArray(order.shipment) && order.shipment.length > 0 ? order.shipment[0] : null
   }));
 

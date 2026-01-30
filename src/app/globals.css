@@ -96,3 +96,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .animate-infinite-scroll {
+    animation: infinite-scroll 40s linear infinite;
+  }
+  
+  .pause-on-hover:hover .animate-infinite-scroll {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes infinite-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

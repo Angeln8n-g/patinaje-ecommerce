@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { Loader2 } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -22,6 +23,7 @@ export default function AdminLayout({
             {children}
           </AuthCheck>
         </main>
+        <Toaster />
       </div>
     </AuthProvider>
   );
