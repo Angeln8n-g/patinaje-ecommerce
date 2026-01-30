@@ -12,7 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { LogIn, Mail, Lock } from "lucide-react";
+import { LogIn, Mail, Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -22,6 +29,7 @@ const formSchema = z.object({
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [showResetSuccess, setShowResetSuccess] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -84,7 +92,7 @@ export default function LoginPage() {
       
       if (error) throw error;
       
-      toast.success("Se ha enviado un enlace de recuperación a tu email. Por favor, revisa tu bandeja de entrada.");
+      setShowResetSuccess(true);
     } catch (error: any) {
       console.error("Error en resetPassword:", error);
       toast.error(error.message || "Error al enviar el enlace de recuperación");
@@ -94,9 +102,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="container max-w-md py-20">
+    <div className="container max-w-md py-20 relative">
+      <Link href="/skating-store" className="absolute top-8 left-4 md:left-0 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-bold uppercase text-xs tracking-widest group">
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+        Volver a la tienda
+      </Link>
+
       <div className={cn(
-        "bg-card p-8 rounded-lg border shadow-sm transition-transform",
+        "bg-card p-8 rounded-lg border shadow-sm transition-transform mt-8",
         shouldShake && "animate-shake border-destructive shadow-destructive/20"
       )}>
         <div className="text-center mb-8">
@@ -166,6 +179,29 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      <Dialog open={showResetSuccess} onOpenChange={setShowResetSuccess}>
+        <DialogContent className="sm:max-w-md text-center py-10">
+          <DialogHeader className="items-center">
+            <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            </div>
+            <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Correo Enviado</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              Hemos enviado un enlace de recuperación a <strong>{form.getValues("email")}</strong>. 
+              Por favor, revisa tu bandeja de entrada y sigue las instrucciones.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6">
+            <Button 
+              onClick={() => setShowResetSuccess(false)}
+              className="w-full font-black uppercase tracking-widest h-12 rounded-full"
+            >
+              Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

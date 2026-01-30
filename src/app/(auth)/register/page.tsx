@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
-import { UserPlus, Mail, Lock } from "lucide-react";
+import { UserPlus, Mail, Lock, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
@@ -63,9 +63,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="container max-w-md py-20">
+    <div className="container max-w-md py-20 relative">
+      <Link href="/skating-store" className="absolute top-8 left-4 md:left-0 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-bold uppercase text-xs tracking-widest group">
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+        Volver a la tienda
+      </Link>
+
       <div className={cn(
-        "bg-card p-8 rounded-lg border shadow-sm transition-transform",
+        "bg-card p-8 rounded-lg border shadow-sm transition-transform mt-8",
         shouldShake && "animate-shake border-destructive shadow-destructive/20"
       )}>
         <div className="text-center mb-8">
