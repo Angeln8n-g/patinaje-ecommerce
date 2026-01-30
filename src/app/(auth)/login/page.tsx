@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { LogIn, Mail, Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { LogIn, Mail, Lock, ArrowLeft, CheckCircle2, AlertCircle, ExternalLink, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [showResetSuccess, setShowResetSuccess] = useState(false);
+  const [showNotRegistered, setShowNotRegistered] = useState(false);
+  const [showEmailNotConfirmed, setShowEmailNotConfirmed] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -52,6 +54,10 @@ export default function LoginPage() {
       });
 
       if (error) {
+        if (error.message.toLowerCase().includes("confirm") || error.message.toLowerCase().includes("verified")) {
+          setShowEmailNotConfirmed(true);
+          return;
+        }
         throw error;
       }
 
@@ -76,7 +82,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Validar formato de email antes de intentar resetear
     const emailResult = z.string().email().safeParse(email);
     if (!emailResult.success) {
       toast.error("Por favor, ingresa un email válido");
@@ -90,7 +95,13 @@ export default function LoginPage() {
         redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       });
       
-      if (error) throw error;
+      if (error) {
+        if (error.message.toLowerCase().includes("not found") || error.message.toLowerCase().includes("not registered")) {
+          setShowNotRegistered(true);
+          return;
+        }
+        throw error;
+      }
       
       setShowResetSuccess(true);
     } catch (error: any) {
@@ -187,7 +198,7 @@ export default function LoginPage() {
               <CheckCircle2 className="h-10 w-10 text-emerald-600" />
             </div>
             <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Correo Enviado</DialogTitle>
-            <DialogDescription className="text-base pt-2">
+            <DialogDescription className="text-base pt-2 text-center">
               Hemos enviado un enlace de recuperación a <strong>{form.getValues("email")}</strong>. 
               Por favor, revisa tu bandeja de entrada y sigue las instrucciones.
             </DialogDescription>
@@ -198,6 +209,68 @@ export default function LoginPage() {
               className="w-full font-black uppercase tracking-widest h-12 rounded-full"
             >
               Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showNotRegistered} onOpenChange={setShowNotRegistered}>
+        <DialogContent className="sm:max-w-md text-center py-10">
+          <DialogHeader className="items-center">
+            <div className="h-16 w-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+              <UserPlus className="h-10 w-10 text-amber-600" />
+            </div>
+            <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">No registrado</DialogTitle>
+            <DialogDescription className="text-base pt-2 text-center">
+              Parece que el correo <strong>{form.getValues("email")}</strong> no está registrado en nuestra base de datos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6 flex flex-col gap-3">
+            <Link href="/register" className="w-full">
+              <Button className="w-full font-black uppercase tracking-widest h-12 rounded-full">
+                Crear una cuenta
+              </Button>
+            </Link>
+            <Button 
+              variant="ghost"
+              onClick={() => setShowNotRegistered(false)}
+              className="w-full font-bold uppercase tracking-widest h-12 rounded-full"
+            >
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEmailNotConfirmed} onOpenChange={setShowEmailNotConfirmed}>
+        <DialogContent className="sm:max-w-md text-center py-10">
+          <DialogHeader className="items-center">
+            <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="h-10 w-10 text-blue-600" />
+            </div>
+            <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Confirma tu email</DialogTitle>
+            <DialogDescription className="text-base pt-2 text-center">
+              Debes confirmar tu registro antes de poder iniciar sesión. Revisa tu correo y haz clic en el enlace de verificación.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6 flex flex-col gap-3">
+            <a 
+              href="https://mail.google.com/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-full"
+            >
+              <Button className="w-full font-black uppercase tracking-widest h-12 rounded-full flex items-center justify-center gap-2 bg-[#EA4335] hover:bg-[#EA4335]/90">
+                Ir a Gmail
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </a>
+            <Button 
+              variant="ghost"
+              onClick={() => setShowEmailNotConfirmed(false)}
+              className="w-full font-bold uppercase tracking-widest h-12 rounded-full"
+            >
+              Cerrar
             </Button>
           </div>
         </DialogContent>
