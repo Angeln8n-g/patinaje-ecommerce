@@ -53,6 +53,9 @@ export default function RegisterPage() {
       const { error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/skating-store`,
+        },
       });
 
       if (error) {
