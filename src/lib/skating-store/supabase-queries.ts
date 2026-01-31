@@ -183,7 +183,8 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
       address: dbOrder.customer_address,
       city: dbOrder.customer_city,
       postalCode: dbOrder.customer_postal_code,
-      phone: dbOrder.customer_phone
+      phone: dbOrder.customer_phone,
+      email: dbOrder.customer_email
     }
   };
 }
@@ -198,6 +199,7 @@ export async function createOrder(items: CartItem[], shipping: ShippingInfo, tot
     customer_city: shipping.city,
     customer_postal_code: shipping.postalCode,
     customer_phone: shipping.phone,
+    customer_email: user?.email || null,
     items: items,
     total: total,
     status: 'pending',

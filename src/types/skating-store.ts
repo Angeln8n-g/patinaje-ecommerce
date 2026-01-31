@@ -78,6 +78,7 @@ export interface ShippingInfo {
   city: string;
   postalCode: string;
   phone: string;
+  email?: string;
 }
 
 export interface Order {

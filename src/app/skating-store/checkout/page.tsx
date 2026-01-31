@@ -5,6 +5,7 @@ import { CheckoutForm } from "@/components/skating-store/checkout/CheckoutForm";
 import { OrderSummary } from "@/components/skating-store/checkout/OrderSummary";
 import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { createOrder, getProfile, updateProfile } from "@/lib/skating-store/supabase-queries";
+import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { ShippingInfo } from "@/types/skating-store";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -47,6 +48,17 @@ export default function CheckoutPage() {
         return;
       }
       const order = await createOrder(items, data, total, data.paymentMethod);
+      
+      // Si el pago es con tarjeta, generar factura automáticamente
+      if (data.paymentMethod === 'card') {
+        try {
+          await generateAndSendInvoice(order.id, user.email || "", total);
+        } catch (invoiceError) {
+          console.error("Error generating automatic invoice:", invoiceError);
+          // No bloqueamos el flujo principal si falla la factura
+        }
+      }
+
       await updateProfile(user.id, {
         first_name: data.fullName.split(" ")[0] || null,
         last_name: data.fullName.split(" ").slice(1).join(" ") || null,

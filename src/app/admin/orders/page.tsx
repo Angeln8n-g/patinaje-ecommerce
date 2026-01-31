@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, FileText } from "lucide-react";
+import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -83,6 +84,23 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const handleSendInvoice = async (order: any) => {
+    try {
+      // Intentamos obtener el email del cliente
+      const customerEmail = order.customer_email || (order.user_id ? "cliente@example.com" : null); // Fallback si no hay email en la orden
+      
+      if (!customerEmail) {
+        toast.error("No se encontró el email del cliente");
+        return;
+      }
+
+      await generateAndSendInvoice(order.id, customerEmail, order.total);
+      toast.success("Factura generada y enviada correctamente");
+    } catch (error) {
+      toast.error("Error al generar la factura");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-10">
@@ -137,45 +155,56 @@ export default function AdminOrdersPage() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setSelectedOrder(order.id)}
-                      >
-                        {order.shipment ? "Reasignar" : "Asignar"}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Asignar Repartidor</DialogTitle>
-                      </DialogHeader>
-                      <div className="py-4 space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Seleccionar Repartidor</label>
-                          <Select 
-                            onValueChange={setSelectedDeliveryMan} 
-                            value={selectedDeliveryMan}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecciona..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {deliveryMen.map((dm) => (
-                                <SelectItem key={dm.id} value={dm.id}>
-                                  {dm.email}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button className="w-full" onClick={handleAssign} disabled={!selectedDeliveryMan}>
-                          Confirmar Asignación
+                  <div className="flex items-center gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedOrder(order.id)}
+                        >
+                          {order.shipment ? "Reasignar" : "Asignar"}
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Asignar Repartidor</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Seleccionar Repartidor</label>
+                            <Select 
+                              onValueChange={setSelectedDeliveryMan} 
+                              value={selectedDeliveryMan}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {deliveryMen.map((dm) => (
+                                  <SelectItem key={dm.id} value={dm.id}>
+                                    {dm.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button className="w-full" onClick={handleAssign} disabled={!selectedDeliveryMan}>
+                            Confirmar Asignación
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSendInvoice(order)}
+                      title="Enviar Factura"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

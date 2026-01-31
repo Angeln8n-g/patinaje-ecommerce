@@ -4,9 +4,10 @@ import { Shipment, ShipmentStatus } from "@/types/skating-store";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Phone, Package, Navigation, QrCode, Banknote, CheckCircle2 } from "lucide-react";
+import { MapPin, Phone, Package, Navigation, QrCode, Banknote, CheckCircle2, FileText } from "lucide-react";
 import { updateShipmentStatus } from "@/lib/skating-store/delivery-actions";
 import { confirmCashPayment } from "@/lib/skating-store/supabase-queries";
+import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -79,6 +80,27 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
     } catch (e) {
       console.error(e);
       toast.error("Código QR inválido o error al procesar el pago");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    setIsLoading(true);
+    try {
+      // Obtenemos el email del usuario del pedido o del perfil
+      const { data: { user } } = await (await import('@/lib/supabase/client')).createClient().auth.getUser();
+      const customerEmail = order.user_email || order.customer_email || user?.email;
+      
+      if (!customerEmail) {
+        toast.error("No se encontró el email del cliente");
+        return;
+      }
+
+      await generateAndSendInvoice(order.id, customerEmail, order.total);
+      toast.success("Factura enviada correctamente al cliente");
+    } catch (error) {
+      toast.error("Error al enviar la factura");
     } finally {
       setIsLoading(false);
     }
@@ -197,6 +219,18 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
                   </Button>
                 )}
               </div>
+            )}
+
+            {shipment.status === 'ENTREGADO' && (
+              <Button 
+                variant="outline" 
+                className="w-full h-11 rounded-xl font-bold border-primary text-primary hover:bg-primary/5" 
+                onClick={handleSendInvoice}
+                disabled={isLoading}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Enviar Factura al Cliente
+              </Button>
             )}
 
             {shipment.status === 'CERCA' && (
