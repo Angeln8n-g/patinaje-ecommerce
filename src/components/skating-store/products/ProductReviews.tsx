@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { Review } from "@/types/skating-store";
-import { getProductReviews, createProductReview, getProfile } from "@/lib/skating-store/supabase-queries";
+import { getProductReviews, createProductReview, getProfile, hasPurchasedProduct } from "@/lib/skating-store/supabase-queries";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, MessageCircle, User as UserIcon, Loader2 } from "lucide-react";
+import { Star, MessageCircle, User as UserIcon, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +20,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [canReview, setCanReview] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 5, comment: "" });
   const supabase = createClient();
 
@@ -31,6 +32,11 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser();
     setUser(user);
+    
+    if (user) {
+      const eligible = await hasPurchasedProduct(user.id, productId);
+      setCanReview(eligible);
+    }
   }
 
   async function fetchReviews() {
@@ -92,7 +98,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     <div className="space-y-8 mt-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-2">
+          <h2 className="text-2xl flex items-center gap-2">
             <MessageCircle className="h-6 w-6 text-primary" />
             Reseñas del Producto
           </h2>
@@ -116,9 +122,25 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
 
       <Separator />
 
-      {user ? (
+      {!user ? (
+        <div className="bg-muted/30 p-6 rounded-xl border text-center">
+          <p className="text-muted-foreground mb-4">Debes iniciar sesión para dejar una reseña</p>
+          <Button variant="outline" asChild>
+            <a href="/login">Iniciar Sesión</a>
+          </Button>
+        </div>
+      ) : !canReview ? (
+        <div className="bg-amber-50/50 p-6 rounded-xl border border-amber-100 flex flex-col items-center text-center">
+          <ShieldCheck className="h-10 w-10 text-amber-500 mb-3" />
+          <h3 className="text-sm">Reseña exclusiva para compradores</h3>
+          <p className="text-amber-800/70 text-sm mt-2 max-w-md font-sans not-italic tracking-normal lowercase first-letter:uppercase">
+            Solo los usuarios que han comprado y recibido este producto pueden dejar una reseña. 
+            ¡Asegúrate de completar tu pedido para compartir tu experiencia!
+          </p>
+        </div>
+      ) : (
         <form onSubmit={handleSubmitReview} className="bg-muted/30 p-6 rounded-xl border space-y-4">
-          <h3 className="font-bold uppercase text-sm tracking-widest">Deja tu opinión</h3>
+          <h3 className="text-sm">Deja tu opinión</h3>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Tu valoración:</span>
             <div className="flex items-center">
@@ -154,13 +176,6 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             Publicar Reseña
           </Button>
         </form>
-      ) : (
-        <div className="bg-muted/30 p-6 rounded-xl border text-center">
-          <p className="text-muted-foreground mb-4">Debes iniciar sesión para dejar una reseña</p>
-          <Button variant="outline" asChild>
-            <a href="/login">Iniciar Sesión</a>
-          </Button>
-        </div>
       )}
 
       <div className="space-y-6">

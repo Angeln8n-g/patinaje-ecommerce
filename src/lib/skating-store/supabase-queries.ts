@@ -423,3 +423,21 @@ export async function createProductReview(review: Omit<Review, 'id' | 'created_a
 
   return data as Review;
 }
+
+export async function hasPurchasedProduct(userId: string, productId: string) {
+  // Buscamos en los pedidos del usuario que tengan estado 'delivered'
+  // y que contengan el producto en el campo JSONB 'items'
+  const { data, error } = await supabase
+    .from('skating_orders')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('status', 'delivered')
+    .filter('items', 'cs', JSON.stringify([{ product: { id: productId } }]));
+
+  if (error) {
+    console.error('Error checking purchase status:', error);
+    return false;
+  }
+
+  return data && data.length > 0;
+}
