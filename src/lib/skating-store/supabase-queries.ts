@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { Product, Order, ContactMessage, ProductCategory, ShippingInfo, CartItem, InventoryMovement } from '@/types/skating-store';
+import { Product, Order, ContactMessage, ProductCategory, ShippingInfo, CartItem, InventoryMovement, Review } from '@/types/skating-store';
 type StaticContentRow = { slug: string; data: Record<string, unknown>; updated_at: string };
 
 const supabase = createClient();
@@ -392,4 +392,34 @@ export async function updateStaticContentClient(slug: string, newData: Record<st
     if (error) throw error;
     return data;
   }
+}
+
+export async function getProductReviews(productId: string) {
+  const { data, error } = await supabase
+    .from('skating_product_reviews')
+    .select('*')
+    .eq('product_id', productId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching reviews:', error);
+    return [];
+  }
+
+  return data as Review[];
+}
+
+export async function createProductReview(review: Omit<Review, 'id' | 'created_at'>) {
+  const { data, error } = await supabase
+    .from('skating_product_reviews')
+    .insert([review])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating review:', error);
+    throw error;
+  }
+
+  return data as Review;
 }

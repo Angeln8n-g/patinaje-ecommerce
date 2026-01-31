@@ -15,16 +15,31 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
 
   const displayImages = images.length > 0 ? images : [defaultImage];
 
+  const isVideo = (url: string) => {
+    return url.toLowerCase().match(/\.(mp4|webm|ogg)$/) || url.includes("video");
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
-        <Image
-          src={selectedImage}
-          alt={productName}
-          fill
-          className="object-cover"
-          priority
-        />
+        {isVideo(selectedImage) ? (
+          <video
+            src={selectedImage}
+            controls
+            className="h-full w-full object-cover"
+            autoPlay
+            muted
+            loop
+          />
+        ) : (
+          <Image
+            src={selectedImage}
+            alt={productName}
+            fill
+            className="object-cover"
+            priority
+          />
+        )}
       </div>
       {displayImages.length > 1 && (
         <div className="flex gap-4 overflow-auto pb-2 scrollbar-hide">
@@ -37,12 +52,23 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
               )}
               onClick={() => setSelectedImage(image)}
             >
-              <Image
-                src={image}
-                alt={`${productName} thumbnail ${index + 1}`}
-                fill
-                className="object-cover"
-              />
+              {isVideo(image) ? (
+                <div className="flex h-full w-full items-center justify-center bg-black">
+                  <video src={image} className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <div className="h-6 w-6 rounded-full border-2 border-white flex items-center justify-center">
+                      <div className="ml-0.5 h-0 w-0 border-y-[4px] border-y-transparent border-l-[6px] border-l-white" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Image
+                  src={image}
+                  alt={`${productName} thumbnail ${index + 1}`}
+                  fill
+                  className="object-cover"
+                />
+              )}
             </button>
           ))}
         </div>

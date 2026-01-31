@@ -19,46 +19,67 @@ export default function AdminOrdersPage() {
 
   const [assignmentPopupOpen, setAssignmentPopupOpen] = useState(false);
   const [unassignedCount, setUnassignedCount] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (silent = false) => {
+    if (isRefreshing) return;
+    
+    if (!silent) setIsLoading(true);
+    setIsRefreshing(true);
+    
     try {
-      const [ordersData, deliveryMenData] = await Promise.all([
-        getAllOrdersWithShipment(),
-        getAllDeliveryMen()
-      ]);
+      // Execute sequentially or handle errors individually if needed
+      const ordersData = await getAllOrdersWithShipment();
+      const deliveryMenData = await getAllDeliveryMen();
+      
       setOrders(ordersData || []);
       setDeliveryMen(deliveryMenData || []);
       
       const count = (ordersData || []).filter((o: any) => !o.shipment).length;
-      setUnassignedCount(count);
-
-      if (count > unassignedCount) {
+      
+      if (count > unassignedCount && unassignedCount !== 0) {
         setAssignmentPopupOpen(true);
       }
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al cargar datos");
+      
+      setUnassignedCount(count);
+    } catch (error: any) {
+      // Ignore abort errors which are common during navigation/HMR
+      if (error?.name !== 'AbortError') {
+        console.error("Error loading admin data:", error);
+        toast.error("Error al cargar datos");
+      }
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+    
+    if (isMounted) {
+      loadData();
+    }
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleAssign = async () => {
-    if (!selectedOrder || !selectedDeliveryMan) return;
+    if (!selectedOrder || !selectedDeliveryMan || isRefreshing) return;
 
+    setIsRefreshing(true);
     try {
       await assignShipment(selectedOrder, selectedDeliveryMan);
       toast.success("Repartidor asignado correctamente");
       setSelectedOrder(null);
       setSelectedDeliveryMan("");
-      loadData(); // Refresh
+      await loadData(true); // Silent refresh
     } catch (error) {
       toast.error("Error al asignar repartidor");
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -74,7 +95,7 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Gestión de Pedidos</h1>
-        <Button onClick={loadData} variant="outline">Actualizar</Button>
+        <Button onClick={() => loadData(false)} variant="outline">Actualizar</Button>
       </div>
 
       <div className="bg-card rounded-lg border">
