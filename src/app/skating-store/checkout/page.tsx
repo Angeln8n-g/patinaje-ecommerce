@@ -6,6 +6,7 @@ import { OrderSummary } from "@/components/skating-store/checkout/OrderSummary";
 import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { createOrder, getProfile, updateProfile } from "@/lib/skating-store/supabase-queries";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
+import { sendOrderNotification } from "@/lib/skating-store/notification-actions";
 import { ShippingInfo } from "@/types/skating-store";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -49,6 +50,18 @@ export default function CheckoutPage() {
       }
       const order = await createOrder(items, data, total, data.paymentMethod);
       
+      // Notificar al usuario que el pedido ha sido recibido
+      try {
+        await sendOrderNotification({
+          orderId: order.id,
+          customerName: data.fullName,
+          customerEmail: user.email || "",
+          status: 'RECEIVED'
+        });
+      } catch (notifError) {
+        console.error("Error sending initial order notification:", notifError);
+      }
+
       // Si el pago es con tarjeta, generar factura automáticamente
       if (data.paymentMethod === 'card') {
         try {

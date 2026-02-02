@@ -2,22 +2,34 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { Shipment, ShipmentStatus } from "@/types/skating-store";
-import { mapDbOrderToOrder } from "./supabase-queries";
+import { mapDbOrderToOrder, getOrderById } from "./supabase-queries";
+import { sendOrderNotification } from "./notification-actions";
 
 export async function assignShipment(orderId: string, deliveryManId: string) {
   const supabase = await createClient();
   
   // Verify admin role
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
+  const { data: { user: adminUser } } = await supabase.auth.getUser();
+  if (!adminUser) throw new Error("Unauthorized");
   
-  const { data: profile } = await supabase
+  const { data: adminProfile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", adminUser.id)
     .single();
     
-  if (profile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
+  if (adminProfile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
+
+  // Get delivery man info for notification
+  const { data: deliveryManProfile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, email")
+    .eq("id", deliveryManId)
+    .single();
+
+  const deliveryName = deliveryManProfile 
+    ? `${deliveryManProfile.first_name || ""} ${deliveryManProfile.last_name || ""}`.trim() 
+    : "Un repartidor";
 
   // Create or update shipment
   // Check if shipment exists for this order
@@ -27,6 +39,7 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
     .eq("order_id", orderId)
     .single();
 
+  let success = false;
   if (existingShipment) {
     const { error } = await supabase
       .from("shipments")
@@ -38,6 +51,7 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
       .eq("id", existingShipment.id);
       
     if (error) throw new Error("Failed to reassign shipment");
+    success = true;
   } else {
     const { error } = await supabase
       .from("shipments")
@@ -48,6 +62,26 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
       }]);
       
     if (error) throw new Error("Failed to assign shipment");
+    success = true;
+  }
+
+  // Notify customer
+  if (success) {
+    try {
+      const order = await getOrderById(orderId);
+      if (order && order.shipping?.email) {
+        await sendOrderNotification({
+          orderId: order.id,
+          customerName: order.shipping.fullName,
+          customerEmail: order.shipping.email,
+          status: 'ASIGNADO',
+          deliveryName: deliveryName,
+          deliveryRating: 4.9 // Placeholder rating
+        });
+      }
+    } catch (notifError) {
+      console.error("Error sending assignment notification:", notifError);
+    }
   }
 
   return { success: true };
@@ -60,8 +94,15 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
   
-  // RLS will handle the check if the shipment belongs to the user, 
-  // but we can double check role if we want. RLS is safer.
+  // Get current shipment and order info before update
+  const { data: shipmentData } = await supabase
+    .from("shipments")
+    .select(`
+      *,
+      order:skating_orders (*)
+    `)
+    .eq("id", shipmentId)
+    .single();
 
   const updateData: any = {
     status,
@@ -81,6 +122,23 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
   if (error) {
     console.error("Error updating shipment:", error);
     throw new Error("Failed to update shipment");
+  }
+
+  // Notify customer of status change
+  if (shipmentData && (status === 'EN_RUTA' || status === 'CERCA' || status === 'ENTREGADO')) {
+    try {
+      const order = mapDbOrderToOrder(shipmentData.order);
+      if (order && order.shipping?.email) {
+        await sendOrderNotification({
+          orderId: order.id,
+          customerName: order.shipping.fullName,
+          customerEmail: order.shipping.email,
+          status: status
+        });
+      }
+    } catch (notifError) {
+      console.error(`Error sending ${status} notification:`, notifError);
+    }
   }
 
   return { success: true };
