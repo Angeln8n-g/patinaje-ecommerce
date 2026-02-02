@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, MoreHorizontal, Share2, Check } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 export default function CartPage() {
   const { items, total, itemCount, clearCart } = useSkatingCart();
@@ -77,7 +78,7 @@ export default function CartPage() {
             <div className="bg-secondary/30 rounded-2xl p-6 space-y-4">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">${total.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(total)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Delivery</span>
@@ -86,7 +87,7 @@ export default function CartPage() {
               <Separator />
               <div className="flex justify-between font-bold text-xl">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatCurrency(total)}</span>
               </div>
             </div>
           </div>

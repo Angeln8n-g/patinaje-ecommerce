@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Truck, FileText } from "lucide-react";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
+import { formatCurrency } from "@/lib/utils";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -138,7 +139,7 @@ export default function AdminOrdersPage() {
                     <span className="text-xs text-muted-foreground">{order.customer_city}</span>
                   </div>
                 </TableCell>
-                <TableCell>${order.total}</TableCell>
+                <TableCell>{formatCurrency(order.total)}</TableCell>
                 <TableCell>
                   <Badge variant={order.status === 'pending' ? 'outline' : 'default'}>
                     {order.status}

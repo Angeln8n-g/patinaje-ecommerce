@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { Resend } from 'resend';
+import { formatCurrency } from "@/lib/utils";
 
 // Inicializar Resend (La API KEY debe estar en .env.local)
 const resend = process.env.NEXT_PUBLIC_RESEND_API_KEY 
@@ -43,7 +44,7 @@ export async function generateAndSendInvoice(orderId: string, customerEmail: str
             <div style="background: #f9f9f9; padding: 15px; border-radius: 8px;">
               <p><strong>Número de Factura:</strong> ${invoiceNumber}</p>
               <p><strong>ID de Pedido:</strong> ${orderId.slice(0, 8)}</p>
-              <p><strong>Total Pagado:</strong> $${total.toFixed(2)}</p>
+              <p><strong>Total Pagado:</strong> ${formatCurrency(total)}</p>
               <p><strong>Fecha:</strong> ${date.toLocaleDateString()}</p>
             </div>
             <p style="margin-top: 20px; font-size: 12px; color: #666;">

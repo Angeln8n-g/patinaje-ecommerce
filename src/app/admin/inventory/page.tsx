@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Search, Barcode as BarcodeIcon, Package, CheckCircle2, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency } from "@/lib/utils";
 
 export default function InventoryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -238,7 +239,7 @@ export default function InventoryPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Precio Actual</p>
-                    <p className="text-2xl font-bold text-primary">${product.price}</p>
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(product.price)}</p>
                     <p className="text-sm text-muted-foreground">{product.category}</p>
                   </div>
                 </div>

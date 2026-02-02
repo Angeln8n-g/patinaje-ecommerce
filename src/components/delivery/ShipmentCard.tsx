@@ -9,6 +9,7 @@ import { updateShipmentStatus } from "@/lib/skating-store/delivery-actions";
 import { confirmCashPayment } from "@/lib/skating-store/supabase-queries";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BarcodeScanner } from "@/components/admin/BarcodeScanner";
@@ -185,7 +186,7 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
             <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-full">
               <Package className="h-4 w-4 text-primary" />
               <span className="font-black text-primary text-base">
-                ${order.total}
+                {formatCurrency(order.total)}
               </span>
             </div>
           </div>
@@ -267,7 +268,7 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
               <Banknote className="h-5 w-5 text-amber-600" />
               <span className="font-semibold text-lg">Monto a Cobrar:</span>
             </div>
-            <span className="text-2xl font-bold text-primary">${order.total}</span>
+            <span className="text-2xl font-bold text-primary">{formatCurrency(order.total)}</span>
           </div>
         </DialogContent>
       </Dialog>

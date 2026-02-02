@@ -5,6 +5,7 @@ import { ProductReviews } from "@/components/skating-store/products/ProductRevie
 import { notFound } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Star, ShieldCheck, MessageCircle } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -56,7 +57,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
 
             <div className="flex items-center gap-3 mb-2">
-              <div className="text-4xl font-extrabold">${product.price.toFixed(2)}</div>
+              <div className="text-4xl font-extrabold">{formatCurrency(product.price)}</div>
             </div>
           </div>
           

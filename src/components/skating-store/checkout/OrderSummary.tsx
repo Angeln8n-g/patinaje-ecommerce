@@ -4,6 +4,7 @@ import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { CartItem } from "../cart/CartItem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { formatCurrency } from "@/lib/utils";
 
 export function OrderSummary() {
   const { items, total } = useSkatingCart();
@@ -22,7 +23,7 @@ export function OrderSummary() {
         <Separator className="my-4" />
         <div className="flex justify-between items-center font-bold text-lg">
           <span>Total a Pagar</span>
-          <span>${total.toFixed(2)}</span>
+          <span>{formatCurrency(total)}</span>
         </div>
       </CardContent>
     </Card>

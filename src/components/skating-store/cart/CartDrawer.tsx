@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { CartItem } from "./CartItem";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 
 export function CartDrawer() {
   const { items, total, itemCount } = useSkatingCart();
@@ -45,7 +46,7 @@ export function CartDrawer() {
           <div className="border-t pt-4 space-y-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
-              <span>${total.toFixed(2)}</span>
+              <span>{formatCurrency(total)}</span>
             </div>
             <SheetClose asChild>
               <Link href="/skating-store/checkout" className="w-full">

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Package, Truck, CheckCircle2, MapPin, Banknote, QrCode, Clock, Phone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -138,7 +138,7 @@ export default function OrderTrackingPage() {
               <div className="text-center space-y-2">
                 <div className="flex items-center justify-center gap-2 text-primary font-bold text-xl">
                   <Banknote className="h-6 w-6" />
-                  <span>Total a pagar: ${order.total.toFixed(2)}</span>
+                  <span>Total a pagar: {formatCurrency(order.total)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground max-w-xs mx-auto">
                   Este código es único para tu pedido. Una vez escaneado, el estado se actualizará automáticamente a "Entregado".
@@ -182,12 +182,12 @@ export default function OrderTrackingPage() {
                   <span className="text-muted-foreground">
                     <span className="font-bold text-foreground">{item.quantity}x</span> {item.product.name}
                   </span>
-                  <span className="font-medium">${(item.product.price * item.quantity).toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(item.product.price * item.quantity)}</span>
                 </div>
               ))}
               <div className="pt-3 border-t flex justify-between items-center font-bold text-lg">
                 <span>Total</span>
-                <span className="text-primary">${order.total.toFixed(2)}</span>
+                <span className="text-primary">{formatCurrency(order.total)}</span>
               </div>
               <div className="pt-2">
                 <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted font-medium">
