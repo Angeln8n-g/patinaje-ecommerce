@@ -41,6 +41,20 @@ export function Navbar() {
 
   React.useEffect(() => {
     setIsClient(true);
+    
+    // Cargar configuración global del sitio (independiente del usuario)
+    getStaticContentClient('site-settings').then((settings) => {
+      const data = settings?.data || {};
+      // @ts-ignore
+      if (data.store_title) setStoreTitle(data.store_title as string);
+      // @ts-ignore
+      if (data.logo_url) setLogoUrl(data.logo_url as string);
+    }).catch(err => console.error("Error loading site settings:", err));
+
+  }, []); // Se ejecuta solo al montar el componente
+
+  React.useEffect(() => {
+    // Cargar datos específicos del usuario
     if (user) {
       getProfile(user.id).then((profile) => {
         if (profile?.address_street) {
@@ -49,14 +63,9 @@ export function Navbar() {
           setAddress("Configura tu dirección de envío");
         }
       });
+    } else {
+      setAddress("Dirección no configurada");
     }
-    getStaticContentClient('site-settings').then((settings) => {
-      const data = settings?.data || {};
-      // @ts-ignore - Supabase JSON type inference issue
-      if (data.store_title) setStoreTitle(data.store_title as string);
-      // @ts-ignore - Supabase JSON type inference issue
-      if (data.logo_url) setLogoUrl(data.logo_url as string);
-    });
   }, [user]);
 
   if (!isClient) {

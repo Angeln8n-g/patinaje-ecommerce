@@ -62,15 +62,17 @@ export function CategoryShowcase({ categories = [] }: CategoryShowcaseProps) {
       ) : (
         <div className="relative w-full overflow-hidden pause-on-hover">
           <div 
-            className="flex gap-8 w-max animate-infinite-scroll"
-            style={{ animationDuration: `${speed}s` }}
+            className="flex gap-8 w-full md:w-max overflow-x-auto md:overflow-hidden pb-4 md:pb-0 justify-start md:justify-center animate-none md:animate-infinite-scroll hover:animation-play-state-paused touch-pan-x snap-x snap-mandatory md:snap-none no-scrollbar"
+            style={{ 
+              animationDuration: `${speed}s`,
+            }}
           >
-            {/* Duplicamos las categorías para crear el efecto de bucle infinito suave */}
+            {/* Duplicamos las categorías para crear el efecto de bucle infinito suave solo en desktop */}
             {[...displayCategories, ...displayCategories, ...displayCategories].map((category, index) => (
               <Link 
                 key={`${category.id}-${index}`} 
                 href={`/skating-store/catalogo?category=${category.slug}`} 
-                className="group flex flex-col items-center gap-3 min-w-[80px]"
+                className="group flex flex-col items-center gap-3 min-w-[80px] snap-center shrink-0"
               >
                 <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-secondary flex items-center justify-center transition-all group-hover:bg-primary group-hover:shadow-lg group-hover:scale-105">
                   {/* Icon or Letter */}
