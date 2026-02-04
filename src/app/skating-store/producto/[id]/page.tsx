@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Star, ShieldCheck, MessageCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export const dynamic = 'force-dynamic';
+export const dynamicParams = true; // Permite generar páginas bajo demanda si no están pre-generadas
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
