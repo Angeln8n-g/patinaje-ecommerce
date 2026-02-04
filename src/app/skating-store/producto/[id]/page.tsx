@@ -13,6 +13,16 @@ interface ProductPageProps {
   params: Promise<{ id: string }>;
 }
 
+export async function generateStaticParams() {
+  const { data: products } = await (await import('@/lib/supabase/client')).createClient()
+    .from('skating_products')
+    .select('id');
+
+  return (products || []).map((product) => ({
+    id: product.id,
+  }));
+}
+
 export default async function ProductPage({ params }: ProductPageProps) {
   const resolvedParams = await params;
   const { id } = resolvedParams;

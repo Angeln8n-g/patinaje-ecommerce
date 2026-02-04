@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import { getOrderById } from "@/lib/skating-store/supabase-queries";
 import { Order } from "@/types/skating-store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useParams } from "next/navigation"; // Importante: usar useParams en cliente
 
 const STEPS = [
   { id: 'pending', label: 'Pendiente', icon: Clock },
@@ -20,7 +20,8 @@ const STEPS = [
 ];
 
 export default function OrderTrackingPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params?.id as string;
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +29,7 @@ export default function OrderTrackingPage() {
     if (id) {
       const loadOrder = async () => {
         try {
-          const data = await getOrderById(id as string);
+          const data = await getOrderById(id);
           setOrder(data);
         } catch (error) {
           console.error(error);
@@ -37,11 +38,16 @@ export default function OrderTrackingPage() {
         }
       };
       loadOrder();
-      
-      // Podríamos añadir una suscripción en tiempo real aquí si fuera necesario
     }
   }, [id]);
 
+  if (loading) {
+    return (
+      <div className="flex h-[70vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
   if (loading) {
     return (
       <div className="flex h-[70vh] items-center justify-center">
