@@ -40,6 +40,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
             fill
             className="object-cover"
             priority
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         )}
       </div>
@@ -69,6 +70,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                   alt={`${productName} thumbnail ${index + 1}`}
                   fill
                   className="object-cover"
+                  sizes="80px"
                 />
               )}
             </button>

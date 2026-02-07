@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   :root {
     /* Lime Green Theme - Updated based on reference */
     --primary: oklch(0.88 0.24 110); /* #D7F000 approx - The bright lime button */

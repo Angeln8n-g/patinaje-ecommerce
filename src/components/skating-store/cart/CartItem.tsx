@@ -29,6 +29,7 @@ export function CartItem({ item, editable = true }: CartItemProps) {
           alt={product.name}
           fill
           className="object-contain mix-blend-multiply"
+          sizes="96px"
         />
       </div>
       
