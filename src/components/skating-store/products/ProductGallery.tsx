@@ -24,12 +24,14 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
       <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
         {isVideo(selectedImage) ? (
           <video
+            key={selectedImage}
             src={selectedImage}
             controls
             className="h-full w-full object-cover"
             autoPlay
             muted
             loop
+            playsInline
           />
         ) : (
           <Image

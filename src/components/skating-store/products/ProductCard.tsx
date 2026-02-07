@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/types/skating-store";
@@ -19,6 +19,7 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useSkatingCart();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleAddToCart = (e: React.MouseEvent) => {
@@ -40,7 +41,6 @@ export function ProductCard({ product }: ProductCardProps) {
       if (playPromise !== undefined) {
         playPromise.catch((error) => {
           // Auto-play was prevented or source invalid
-          // Silently fail to avoid console errors
         });
       }
     }
@@ -50,6 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
+      setIsPlaying(false);
     }
   };
 
@@ -87,7 +88,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         <div className="relative aspect-square p-6 bg-[#F8F9FA] overflow-hidden">
           {/* Default Image */}
-          <div className={`relative w-full h-full transition-opacity duration-300 ${videoUrl ? 'group-hover:opacity-0' : ''}`}>
+          <div className={`relative w-full h-full transition-opacity duration-300 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
              <Image
               src={coverImage}
               alt={product.name}
@@ -99,7 +100,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {/* Hover Video (if available) */}
           {videoUrl && (
-            <div className="absolute inset-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className={`absolute inset-0 p-6 transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
                <video
                 ref={videoRef}
                 src={videoUrl}
@@ -108,6 +109,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 loop
                 playsInline
                 preload="metadata"
+                onPlaying={() => setIsPlaying(true)}
               />
             </div>
           )}
