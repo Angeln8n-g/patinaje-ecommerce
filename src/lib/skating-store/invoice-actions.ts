@@ -1,14 +1,15 @@
-import { createClient } from "@/lib/supabase/client";
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
 import { Resend } from 'resend';
 import { formatCurrency } from "@/lib/utils";
 
-// Inicializar Resend (La API KEY debe estar en .env.local)
-const resend = process.env.NEXT_PUBLIC_RESEND_API_KEY 
-  ? new Resend(process.env.NEXT_PUBLIC_RESEND_API_KEY) 
-  : null;
+// Inicializar Resend
+const resendApiKey = process.env.RESEND_API_KEY || process.env.NEXT_PUBLIC_RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 export async function generateAndSendInvoice(orderId: string, customerEmail: string, total: number) {
-  const supabase = createClient();
+  const supabase = await createClient();
   
   try {
     // 1. Generar número de factura
@@ -28,11 +29,14 @@ export async function generateAndSendInvoice(orderId: string, customerEmail: str
         status: 'sent'
       }]);
 
-    if (dbError) throw dbError;
+    if (dbError) {
+       console.error("Database error creating invoice:", dbError);
+       throw new Error(`Database error: ${dbError.message}`);
+    }
 
     // 3. Envío de email real con Resend (si hay API Key)
     if (resend) {
-      await resend.emails.send({
+      const { error: emailError } = await resend.emails.send({
         from: 'RD Patina <onboarding@resend.dev>', // Cambiar por tu dominio verificado después
         to: customerEmail,
         subject: `Tu Factura ${invoiceNumber} - RD Patina`,
@@ -53,15 +57,23 @@ export async function generateAndSendInvoice(orderId: string, customerEmail: str
           </div>
         `
       });
-      console.log(`Factura real enviada vía Resend a ${customerEmail}`);
+      
+      if (emailError) {
+        console.error("Error sending email via Resend:", emailError);
+        // No lanzamos error aquí para no revertir la creación de la factura en DB, pero logueamos
+      } else {
+        console.log(`Factura real enviada vía Resend a ${customerEmail}`);
+      }
     } else {
       console.log(`[MODO SIMULACIÓN] Factura ${invoiceNumber} para ${customerEmail}`);
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // await new Promise(resolve => setTimeout(resolve, 800)); // No blocking delay needed in server action really
     }
 
     return { success: true, invoiceNumber };
-  } catch (error) {
-    console.error("Error al generar/enviar factura:", error);
-    throw error;
+  } catch (error: any) {
+    // Mejorar el logging del error
+    console.error("Error al generar/enviar factura:", error.message || error);
+    // Return error object instead of throwing to avoid crashing client if not handled properly
+    return { success: false, error: error.message || "Unknown error" };
   }
 }

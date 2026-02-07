@@ -1,8 +1,9 @@
+"use server";
+
 import { Resend } from 'resend';
 
-const resend = process.env.NEXT_PUBLIC_RESEND_API_KEY 
-  ? new Resend(process.env.NEXT_PUBLIC_RESEND_API_KEY) 
-  : null;
+const resendApiKey = process.env.RESEND_API_KEY || process.env.NEXT_PUBLIC_RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -23,7 +24,10 @@ export async function sendOrderNotification({
   deliveryName, 
   deliveryRating 
 }: NotificationData) {
-  if (!resend || !customerEmail) return;
+  if (!resend || !customerEmail) {
+    console.log(`[Notification Skipped] Resend available: ${!!resend}, Email provided: ${!!customerEmail}`);
+    return;
+  }
 
   let subject = '';
   let title = '';
@@ -61,12 +65,15 @@ export async function sendOrderNotification({
       message = 'El pedido ha sido entregado exitosamente. ¡Gracias por confiar en RD Patina!';
       color = '#10B981'; // Emerald/Green for success
       break;
+    default:
+       console.log(`Unknown status for notification: ${status}`);
+       return;
   }
 
   const trackingLink = `${APP_URL}/skating-store/tracking/${orderId}`;
 
   try {
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: 'RD Patina <onboarding@resend.dev>',
       to: customerEmail,
       subject: subject,
@@ -94,7 +101,15 @@ export async function sendOrderNotification({
         </div>
       `
     });
-  } catch (error) {
-    console.error(`Error enviando notificación (${status}):`, error);
+
+    if (error) {
+       console.error("Resend API Error:", error);
+       throw new Error(error.message);
+    }
+    
+    console.log(`Notification sent: ${status} to ${customerEmail}`);
+  } catch (error: any) {
+    console.error(`Error enviando notificación (${status}):`, error.message || error);
+    // Don't throw, just log, so we don't break the main flow
   }
 }
