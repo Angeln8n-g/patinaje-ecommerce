@@ -30,6 +30,7 @@ export async function getCart(userId: string): Promise<CartItem[]> {
       .from("cart_items")
       .select(`
         quantity,
+        selected_variant,
         product:skating_products (
           id,
           name,
@@ -38,7 +39,9 @@ export async function getCart(userId: string): Promise<CartItem[]> {
           category,
           images,
           stock,
-          featured
+          featured,
+          variant_type,
+          variant_options
         )
       `)
       .eq("cart_id", cart.id);
@@ -52,6 +55,7 @@ export async function getCart(userId: string): Promise<CartItem[]> {
     return items.map((item: any) => ({
       product: item.product,
       quantity: item.quantity,
+      selectedVariant: item.selected_variant || undefined
     }));
   } catch (error) {
     console.error("Error in getCart:", error);
@@ -59,7 +63,7 @@ export async function getCart(userId: string): Promise<CartItem[]> {
   }
 }
 
-export async function addToCart(userId: string, productId: string, quantity: number) {
+export async function addToCart(userId: string, productId: string, quantity: number, variant?: string) {
   try {
     const supabase = await createClient();
     
@@ -105,13 +109,20 @@ export async function addToCart(userId: string, productId: string, quantity: num
 
     if (!cart) throw new Error("Could not create cart (unknown error)");
 
-    // 2. Check if item exists
-    const { data: existingItem, error: itemError } = await supabase
+    // 2. Check if item exists (with same variant)
+    let query = supabase
       .from("cart_items")
       .select("id, quantity")
       .eq("cart_id", cart.id)
-      .eq("product_id", productId)
-      .maybeSingle();
+      .eq("product_id", productId);
+    
+    if (variant) {
+      query = query.eq("selected_variant", variant);
+    } else {
+      query = query.is("selected_variant", null);
+    }
+
+    const { data: existingItem, error: itemError } = await query.maybeSingle();
 
     if (itemError) {
         console.error("addToCart: Error checking item", itemError);
@@ -136,7 +147,8 @@ export async function addToCart(userId: string, productId: string, quantity: num
         .insert([{
           cart_id: cart.id,
           product_id: productId,
-          quantity: quantity
+          quantity: quantity,
+          selected_variant: variant || null
         }]);
         
       if (insertError) {

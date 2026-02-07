@@ -53,6 +53,8 @@ export interface Product {
   supplier?: string;
   purchase_price?: number;
   status: 'active' | 'inactive';
+  variant_type?: 'none' | 'size' | 'measurement';
+  variant_options?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +72,7 @@ export interface InventoryMovement {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedVariant?: string;
 }
 
 export interface ShippingInfo {

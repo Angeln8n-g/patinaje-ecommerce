@@ -168,10 +168,16 @@ export async function getProductById(id: string) {
 export function mapDbOrderToOrder(dbOrder: any): Order {
   if (!dbOrder) return null as any;
   
+  // Parse items to ensure variants are included if present
+  // If items come as JSON string, parse them, otherwise use as is
+  const parsedItems = typeof dbOrder.items === 'string' 
+    ? JSON.parse(dbOrder.items) 
+    : dbOrder.items;
+
   return {
     id: dbOrder.id,
     user_id: dbOrder.user_id,
-    items: dbOrder.items,
+    items: parsedItems,
     total: dbOrder.total,
     status: dbOrder.status,
     payment_method: dbOrder.payment_method,

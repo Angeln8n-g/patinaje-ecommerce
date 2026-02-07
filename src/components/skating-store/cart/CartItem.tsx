@@ -35,6 +35,11 @@ export function CartItem({ item, editable = true }: CartItemProps) {
       <div className="flex flex-1 items-center justify-between">
         <div className="space-y-2">
           <h3 className="font-semibold text-base line-clamp-2 max-w-[240px] leading-tight">{product.name}</h3>
+          {item.selectedVariant && (
+            <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+              {product.variant_type === 'size' ? 'Talla' : 'Medida'}: {item.selectedVariant}
+            </div>
+          )}
           <p className="font-extrabold text-xl">{formatCurrency(product.price)}</p>
         </div>
         

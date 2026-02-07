@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, quantity: number) => Promise<void>;
+  addItem: (product: Product, quantity: number, variant?: string) => Promise<void>;
   removeItem: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -54,7 +54,7 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
     // Legacy cleanup or empty effect
   }, []);
 
-  const addItem = async (product: Product, quantity: number) => {
+  const addItem = async (product: Product, quantity: number, variant?: string) => {
     if (!user) {
       toast.error("Debes iniciar sesión para comprar", {
         description: "Regístrate o inicia sesión para agregar productos al carrito.",
@@ -70,18 +70,26 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
     try {
       // Optimistic update
       setItems(currentItems => {
-        const existingItem = currentItems.find(item => item.product.id === product.id);
+        // If same product AND same variant (or both no variant)
+        const existingItem = currentItems.find(item => 
+          item.product.id === product.id && item.selectedVariant === variant
+        );
+        
         if (existingItem) {
           return currentItems.map(item => 
-            item.product.id === product.id 
+            (item.product.id === product.id && item.selectedVariant === variant)
               ? { ...item, quantity: item.quantity + quantity }
               : item
           );
         }
-        return [...currentItems, { product, quantity }];
+        return [...currentItems, { product, quantity, selectedVariant: variant }];
       });
 
-      const result = await addToCart(user.id, product.id, quantity);
+      // Pass variant to backend
+      // Note: We need to update addToCart server action to accept variant too.
+      // Assuming cart-actions.ts needs update as well.
+      const result = await addToCart(user.id, product.id, quantity, variant);
+      
       if (!result.success) {
         console.error("Detailed server error:", result.error);
         throw new Error(typeof result.error === 'string' ? result.error : "Failed to add to cart");
@@ -91,7 +99,6 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error adding item:", error);
       toast.error("Error al agregar al carrito");
-      // Revert optimistic update could be implemented here
     } finally {
       setIsLoading(false);
     }

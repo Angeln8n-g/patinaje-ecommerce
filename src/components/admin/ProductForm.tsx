@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Product, Category } from "@/types/skating-store";
 import { createProduct, updateProduct } from "@/lib/skating-store/product-actions";
 import { getCategories } from "@/lib/skating-store/content-actions";
+import { Plus, X, Image as ImageIcon } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -22,8 +23,10 @@ const formSchema = z.object({
   price: z.number().min(0, "El precio no puede ser negativo"),
   stock: z.number().int().min(0, "El stock no puede ser negativo"),
   category: z.string().min(1, "Selecciona una categoría"),
-  images: z.string().url("Debe ser una URL válida"), // For simplicity, single image URL
+  images: z.array(z.string().url("Debe ser una URL válida")).min(1, "Añade al menos una imagen"),
   featured: z.boolean(),
+  variant_type: z.enum(["none", "size", "measurement"]),
+  variant_options: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -35,6 +38,8 @@ interface ProductFormProps {
 export function ProductForm({ initialData }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [imageUrlInput, setImageUrlInput] = useState("");
+  const [variantInput, setVariantInput] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -49,8 +54,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
       price: initialData?.price || 0,
       stock: initialData?.stock || 0,
       category: initialData?.category || "",
-      images: initialData?.images?.[0] || "",
+      images: initialData?.images && initialData.images.length > 0 ? initialData.images : [],
       featured: initialData?.featured || false,
+      variant_type: initialData?.variant_type || "none",
+      variant_options: initialData?.variant_options || [],
     },
   });
 
@@ -59,7 +66,6 @@ export function ProductForm({ initialData }: ProductFormProps) {
     try {
       const productData = {
         ...values,
-        images: [values.images], // Wrap in array
         status: (initialData?.status || 'active') as 'active' | 'inactive',
       };
 
@@ -86,6 +92,39 @@ export function ProductForm({ initialData }: ProductFormProps) {
       setIsLoading(false);
     }
   };
+
+  const addImage = () => {
+    if (!imageUrlInput) return;
+    try {
+      new URL(imageUrlInput); // Validate URL
+      const currentImages = form.getValues("images");
+      form.setValue("images", [...currentImages, imageUrlInput]);
+      setImageUrlInput("");
+    } catch {
+      toast.error("URL inválida");
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const currentImages = form.getValues("images");
+    form.setValue("images", currentImages.filter((_, i) => i !== index));
+  };
+
+  const addVariant = () => {
+    if (!variantInput) return;
+    const currentVariants = form.getValues("variant_options");
+    if (!currentVariants.includes(variantInput)) {
+      form.setValue("variant_options", [...currentVariants, variantInput]);
+    }
+    setVariantInput("");
+  };
+
+  const removeVariant = (option: string) => {
+    const currentVariants = form.getValues("variant_options");
+    form.setValue("variant_options", currentVariants.filter(v => v !== option));
+  };
+
+  const currentVariantType = form.watch("variant_type");
 
   return (
     <Form {...form}>
@@ -122,7 +161,6 @@ export function ProductForm({ initialData }: ProductFormProps) {
                         <SelectItem key={cat.id} value={cat.slug}>{cat.name}</SelectItem>
                       ))
                     ) : (
-                      // Fallback if no categories loaded yet
                       <SelectItem value="loading" disabled>Cargando...</SelectItem>
                     )}
                   </SelectContent>
@@ -205,22 +243,145 @@ export function ProductForm({ initialData }: ProductFormProps) {
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="images"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>URL de Imagen</FormLabel>
-              <FormControl>
-                <Input placeholder="https://..." {...field} />
-              </FormControl>
-              <FormDescription>
-                Por ahora solo soportamos una URL de imagen externa.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
+        {/* Imágenes */}
+        <div className="space-y-4">
+          <FormLabel>Imágenes del Producto</FormLabel>
+          <div className="flex gap-2">
+            <Input 
+              placeholder="https://ejemplo.com/imagen.jpg" 
+              value={imageUrlInput}
+              onChange={(e) => setImageUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addImage();
+                }
+              }}
+            />
+            <Button type="button" onClick={addImage} size="icon">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <FormField
+            control={form.control}
+            name="images"
+            render={({ field }) => (
+              <FormItem>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  {field.value.map((url, index) => (
+                    <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border bg-muted">
+                      <img src={url} alt={`Product ${index}`} className="object-cover w-full h-full" />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeImage(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                      {index === 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
+                          Principal
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {field.value.length === 0 && (
+                    <div className="col-span-full flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg text-muted-foreground">
+                      <ImageIcon className="h-8 w-8 mb-2" />
+                      <p>No hay imágenes añadidas</p>
+                    </div>
+                  )}
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Variantes */}
+        <div className="space-y-4 border p-4 rounded-lg bg-muted/20">
+          <h3 className="font-semibold flex items-center gap-2">
+            Configuración de Medidas / Tallas
+          </h3>
+          
+          <FormField
+            control={form.control}
+            name="variant_type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipo de Variedad</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un tipo" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Ninguno (Producto único)</SelectItem>
+                    <SelectItem value="size">Tallas (ej: 7, 8, S, M, L)</SelectItem>
+                    <SelectItem value="measurement">Medidas (ej: 10cm, 20x30)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Define si el producto tiene opciones seleccionables.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {currentVariantType !== "none" && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <FormLabel>Opciones Disponibles</FormLabel>
+              <div className="flex gap-2">
+                <Input 
+                  placeholder={currentVariantType === 'size' ? "Ej: 42" : "Ej: 100mm"} 
+                  value={variantInput}
+                  onChange={(e) => setVariantInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addVariant();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={addVariant} size="icon">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="variant_options"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {field.value.map((option, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium border border-primary/20">
+                          <span>{option}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeVariant(option)}
+                            className="hover:text-destructive transition-colors ml-1"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {field.value.length === 0 && (
+                        <p className="text-sm text-muted-foreground italic">Añade opciones para que los clientes elijan.</p>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           )}
-        />
+        </div>
 
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline" onClick={() => router.back()}>
