@@ -223,6 +223,34 @@ export async function createOrder(items: CartItem[], shipping: ShippingInfo, tot
 }
 
 export async function getOrderById(id: string) {
+  const supabase = createClient();
+  
+  // Try to get order via RPC (public access for tracking)
+  const { data: rpcData, error: rpcError } = await supabase.rpc('get_tracking_info', { p_order_id: id });
+
+  if (rpcData && rpcData.length > 0) {
+    const dbOrder = rpcData[0];
+    return {
+      id: dbOrder.id,
+      created_at: dbOrder.created_at,
+      status: dbOrder.status as any,
+      total: dbOrder.total,
+      items: dbOrder.items,
+      payment_method: dbOrder.payment_method as any,
+      payment_status: dbOrder.payment_status as any,
+      qr_token: dbOrder.qr_token,
+      shipping: {
+        fullName: dbOrder.customer_name,
+        address: dbOrder.customer_address,
+        city: dbOrder.customer_city,
+        postalCode: dbOrder.customer_postal_code,
+        phone: dbOrder.customer_phone,
+        email: dbOrder.customer_email
+      }
+    } as Order;
+  }
+
+  // Fallback to standard query (requires auth)
   const { data, error } = await supabase
     .from('skating_orders')
     .select('*')
