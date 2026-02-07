@@ -110,6 +110,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
     form.setValue("images", currentImages.filter((_, i) => i !== index));
   };
 
+  const isVideo = (url: string) => {
+    return url.toLowerCase().match(/\.(mp4|webm|ogg)$/) || url.includes("video");
+  };
+
   const addVariant = () => {
     if (!variantInput) return;
     const currentVariants = form.getValues("variant_options");
@@ -271,12 +275,25 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   {field.value.map((url, index) => (
                     <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border bg-muted">
-                      <img src={url} alt={`Product ${index}`} className="object-cover w-full h-full" />
+                      {isVideo(url) ? (
+                        <video src={url} className="object-cover w-full h-full opacity-70" muted />
+                      ) : (
+                        <img src={url} alt={`Product ${index}`} className="object-cover w-full h-full" />
+                      )}
+                      
+                      {isVideo(url) && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/50 rounded-full p-2">
+                             <div className="ml-1 h-0 w-0 border-y-[6px] border-y-transparent border-l-[10px] border-l-white" />
+                          </div>
+                        </div>
+                      )}
+
                       <Button
                         type="button"
                         variant="destructive"
                         size="icon"
-                        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                         onClick={() => removeImage(index)}
                       >
                         <X className="h-3 w-3" />
