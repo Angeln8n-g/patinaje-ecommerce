@@ -314,30 +314,67 @@ export async function getDeliveryMenStats() {
 
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, email, created_at")
+    .select("id, email, first_name, last_name, created_at")
     .eq("role", "DELIVERY");
 
   if (profilesError) return [];
 
-  // Get active shipments counts
-  // We can do this with a join if we had defined it properly or separate queries
-  // For simplicity, let's just fetch all active shipments and count in JS
-  const { data: shipments, error: shipmentsError } = await supabase
+  // Get all delivered shipments with order details
+  const { data: deliveredShipments } = await supabase
     .from("shipments")
-    .select("delivery_man_id, status")
+    .select(`
+      delivery_man_id,
+      status,
+      order:skating_orders (
+        total
+      )
+    `)
+    .eq("status", "ENTREGADO");
+
+  // Get active shipments count
+  const { data: activeShipments } = await supabase
+    .from("shipments")
+    .select("delivery_man_id")
     .neq("status", "ENTREGADO");
-    
-  if (shipmentsError) return profiles.map(p => ({ ...p, activeShipments: 0 }));
+
+  // Get all ratings
+  const { data: ratings } = await supabase
+    .from("delivery_ratings")
+    .select("delivery_man_id, rating");
 
   const stats = profiles.map(profile => {
-    const activeCount = shipments.filter(s => s.delivery_man_id === profile.id).length;
+    const profileId = profile.id;
+    
+    // Active shipments
+    const activeCount = activeShipments?.filter(s => s.delivery_man_id === profileId).length || 0;
+    
+    // Delivered stats
+    const myDelivered = deliveredShipments?.filter(s => s.delivery_man_id === profileId) || [];
+    const deliveredCount = myDelivered.length;
+    const totalSales = myDelivered.reduce((sum, s) => {
+      // @ts-ignore
+      return sum + (s.order?.total || 0);
+    }, 0);
+
+    // Rating stats
+    const myRatings = ratings?.filter(r => r.delivery_man_id === profileId) || [];
+    const ratingCount = myRatings.length;
+    const avgRating = ratingCount > 0 
+      ? myRatings.reduce((sum, r) => sum + r.rating, 0) / ratingCount 
+      : 0;
+
     return {
       ...profile,
-      activeShipments: activeCount
+      activeShipments: activeCount,
+      deliveredCount,
+      totalSales,
+      ratingCount,
+      avgRating
     };
   });
 
-  return stats;
+  // Sort by avgRating by default for ranking
+  return stats.sort((a, b) => b.avgRating - a.avgRating);
 }
 
 export async function getAllOrdersWithShipment() {
