@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/types/skating-store";
@@ -18,6 +19,7 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useSkatingCart();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -30,6 +32,25 @@ export function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     toggleFavorite(product.id);
+  };
+
+  const handleMouseEnter = () => {
+    if (videoRef.current) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          // Auto-play was prevented or source invalid
+          // Silently fail to avoid console errors
+        });
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
   };
 
   // Simulate a previous price for the "Flash Sale" look
@@ -47,7 +68,12 @@ export function ProductCard({ product }: ProductCardProps) {
   const coverImage = product.images.find(img => !isVideo(img)) || product.images[0] || "https://placehold.co/600x600/png?text=Skate";
 
   return (
-    <Link href={`/skating-store/producto/${product.id}`} className="block h-full group">
+    <Link 
+      href={`/skating-store/producto/${product.id}`} 
+      className="block h-full group"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <Card className="h-full border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[32px] bg-card overflow-hidden relative group-hover:-translate-y-1">
         {/* Favorite Icon - Restored for design match */}
         <button 
@@ -75,17 +101,13 @@ export function ProductCard({ product }: ProductCardProps) {
           {videoUrl && (
             <div className="absolute inset-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                <video
+                ref={videoRef}
                 src={videoUrl}
                 className="w-full h-full object-cover rounded-xl"
                 muted
                 loop
                 playsInline
-                autoPlay={false} // Autoplay via JS on hover is more reliable, but CSS hover effect + autoplay attr works in modern browsers
-                onMouseEnter={(e) => e.currentTarget.play()}
-                onMouseLeave={(e) => {
-                  e.currentTarget.pause();
-                  e.currentTarget.currentTime = 0;
-                }}
+                preload="metadata"
               />
             </div>
           )}
