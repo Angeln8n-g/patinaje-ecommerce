@@ -31,20 +31,23 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // Retrieve user session
+  // getUser is safer as it validates the token with the database
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  // Protected routes
+  // Handle protected routes
   if (request.nextUrl.pathname.startsWith('/skating-store/checkout')) {
-    if (!session) {
+    if (error || !user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }
 
   // Admin routes protection
   if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (!session) {
+    if (error || !user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }

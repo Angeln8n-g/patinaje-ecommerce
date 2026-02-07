@@ -33,11 +33,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (error) {
           console.error("Auth session error:", error);
-          if (error.message.includes("Refresh Token Not Found")) {
-            // Clear everything if the token is invalid
+          // Handle specific errors that require clearing session
+          if (
+            error.message.includes("Refresh Token Not Found") || 
+            error.message.includes("Invalid Refresh Token") ||
+            error.message.includes("JWT expired")
+          ) {
+            console.warn("Invalid session detected, clearing...");
             await supabase.auth.signOut();
             setUser(null);
             setRole(null);
+            setIsAdmin(false);
+            setIsDelivery(false);
           }
           return;
         }
@@ -111,11 +118,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setRole(null);
-    setIsAdmin(false);
-    setIsDelivery(false);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("Error signing out:", error);
+    } catch (error) {
+      console.error("Unexpected error signing out:", error);
+    } finally {
+      // Force clear local state regardless of server response
+      setUser(null);
+      setRole(null);
+      setIsAdmin(false);
+      setIsDelivery(false);
+      
+      // Optional: Clear any local storage if used
+      // localStorage.clear(); 
+      
+      // Force refresh to clear any server-side cookies that might be stuck
+      window.location.href = '/login';
+    }
   };
 
   return (
