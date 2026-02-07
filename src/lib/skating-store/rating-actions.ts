@@ -58,6 +58,56 @@ export async function submitDeliveryRating(
   return { success: true };
 }
 
+export async function getDeliveryManStats(deliveryManId: string) {
+  const supabase = await createClient();
+  
+  const { data: ratings, error } = await supabase
+    .from('delivery_ratings')
+    .select('*')
+    .eq('delivery_man_id', deliveryManId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("Error fetching delivery man stats:", error);
+    return null;
+  }
+
+  const totalRatings = ratings.length;
+  if (totalRatings === 0) {
+    return {
+      averageRating: 0,
+      totalRatings: 0,
+      ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      recentComments: []
+    };
+  }
+
+  const sum = ratings.reduce((acc, curr) => acc + curr.rating, 0);
+  const averageRating = sum / totalRatings;
+
+  const ratingDistribution = ratings.reduce((acc, curr) => {
+    acc[curr.rating] = (acc[curr.rating] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
+
+  const recentComments = ratings
+    .filter(r => r.comment && r.comment.length > 0)
+    .slice(0, 5)
+    .map(r => ({
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      created_at: r.created_at
+    }));
+
+  return {
+    averageRating,
+    totalRatings,
+    ratingDistribution,
+    recentComments
+  };
+}
+
 export async function getOrderRating(orderId: string) {
   const supabase = await createClient();
   
