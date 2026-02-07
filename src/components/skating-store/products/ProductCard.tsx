@@ -36,6 +36,16 @@ export function ProductCard({ product }: ProductCardProps) {
   const previousPrice = product.price * 1.2;
   const isFav = isFavorite(product.id);
 
+  // Helper to detect video
+  const isVideo = (url?: string) => {
+    if (!url) return false;
+    return url.toLowerCase().match(/\.(mp4|webm|ogg)$/) || url.includes("video");
+  };
+
+  // Find first video in gallery if any
+  const videoUrl = product.images.find(img => isVideo(img));
+  const coverImage = product.images.find(img => !isVideo(img)) || product.images[0] || "https://placehold.co/600x600/png?text=Skate";
+
   return (
     <Link href={`/skating-store/producto/${product.id}`} className="block h-full group">
       <Card className="h-full border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[32px] bg-card overflow-hidden relative group-hover:-translate-y-1">
@@ -49,14 +59,36 @@ export function ProductCard({ product }: ProductCardProps) {
           <Heart className={`h-5 w-5 ${isFav ? "fill-current" : ""}`} />
         </button>
 
-        <div className="relative aspect-square p-6 bg-[#F8F9FA]">
-          <Image
-            src={product.images[0] || "https://placehold.co/600x600/png?text=Skate"}
-            alt={product.name}
-            fill
-            className="object-contain mix-blend-multiply transition-transform group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          />
+        <div className="relative aspect-square p-6 bg-[#F8F9FA] overflow-hidden">
+          {/* Default Image */}
+          <div className={`relative w-full h-full transition-opacity duration-300 ${videoUrl ? 'group-hover:opacity-0' : ''}`}>
+             <Image
+              src={coverImage}
+              alt={product.name}
+              fill
+              className="object-contain mix-blend-multiply transition-transform group-hover:scale-105"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          </div>
+
+          {/* Hover Video (if available) */}
+          {videoUrl && (
+            <div className="absolute inset-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+               <video
+                src={videoUrl}
+                className="w-full h-full object-cover rounded-xl"
+                muted
+                loop
+                playsInline
+                autoPlay={false} // Autoplay via JS on hover is more reliable, but CSS hover effect + autoplay attr works in modern browsers
+                onMouseEnter={(e) => e.currentTarget.play()}
+                onMouseLeave={(e) => {
+                  e.currentTarget.pause();
+                  e.currentTarget.currentTime = 0;
+                }}
+              />
+            </div>
+          )}
         </div>
         
         <CardContent className="p-4">
