@@ -24,11 +24,7 @@ export async function sendOrderNotification({
   deliveryName, 
   deliveryRating 
 }: NotificationData) {
-  if (!resend || !customerEmail) {
-    console.log(`[Notification Skipped] Resend available: ${!!resend}, Email provided: ${!!customerEmail}`);
-    return;
-  }
-
+  // Determine content before checking Resend to allow simulation logging
   let subject = '';
   let title = '';
   let message = '';
@@ -68,6 +64,17 @@ export async function sendOrderNotification({
     default:
        console.log(`Unknown status for notification: ${status}`);
        return;
+  }
+
+  if (!resend) {
+    console.log(`[Notification Simulated] Status: ${status} | To: ${customerEmail}`);
+    console.log(`[Content] Subject: ${subject}`);
+    return;
+  }
+
+  if (!customerEmail) {
+    console.log(`[Notification Skipped] Email missing for order ${orderId}`);
+    return;
   }
 
   const trackingLink = `${APP_URL}/skating-store/tracking/${orderId}`;
