@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { BarcodeScanner } from "@/components/admin/BarcodeScanner";
 import { cn } from "@/lib/utils";
 import { mapDbOrderToOrder } from "@/lib/skating-store/supabase-queries";
+import { createInAppNotification } from "@/lib/skating-store/in-app-notifications";
 
 interface ShipmentCardProps {
   shipment: any; // Using any for now to handle joined data easily
@@ -75,6 +76,18 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
       
       setIsLoading(true);
       await confirmCashPayment(data.orderId, data.qrToken);
+      
+      // Notificar finalización de compra por pago en efectivo
+      if (order.user_id) {
+        await createInAppNotification({
+          user_id: order.user_id,
+          order_id: order.id,
+          title: "¡Pago Confirmado!",
+          message: `Hemos recibido tu pago en efectivo de ${formatCurrency(order.total)}. ¡Gracias!`,
+          type: 'success'
+        });
+      }
+
       toast.success("Pago confirmado y pedido entregado");
       setIsScannerOpen(false);
       onUpdate();

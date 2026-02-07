@@ -27,57 +27,42 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const router = useRouter();
 
-  // Load cart from DB if user is logged in, otherwise from localStorage
+  // Load cart from DB if user is logged in
   useEffect(() => {
     const loadCart = async () => {
-      setIsLoading(true);
       if (user) {
+        setIsLoading(true);
         try {
           const cartItems = await getCart(user.id);
           setItems(cartItems);
         } catch (error) {
           console.error("Error loading cart from DB:", error);
+        } finally {
+          setIsLoading(false);
         }
       } else {
-        const savedCart = localStorage.getItem('skating-cart');
-        if (savedCart) {
-          try {
-            setItems(JSON.parse(savedCart));
-          } catch (e) {
-            console.error('Failed to parse cart from local storage', e);
-          }
-        } else {
-          setItems([]);
-        }
+        setItems([]);
       }
       setIsLoaded(true);
-      setIsLoading(false);
     };
 
     loadCart();
   }, [user]);
 
-  // Save to local storage on change (only if not logged in)
+  // Save to local storage logic removed as we enforce login
   useEffect(() => {
-    if (isLoaded && !user) {
-      localStorage.setItem('skating-cart', JSON.stringify(items));
-    }
-  }, [items, isLoaded, user]);
+    // Legacy cleanup or empty effect
+  }, []);
 
   const addItem = async (product: Product, quantity: number) => {
     if (!user) {
-      setItems(currentItems => {
-        const existingItem = currentItems.find(item => item.product.id === product.id);
-        if (existingItem) {
-          return currentItems.map(item => 
-            item.product.id === product.id 
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
-        }
-        return [...currentItems, { product, quantity }];
+      toast.error("Debes iniciar sesión para comprar", {
+        description: "Regístrate o inicia sesión para agregar productos al carrito.",
+        action: {
+          label: "Ir a Login",
+          onClick: () => router.push("/login"),
+        },
       });
-      toast.success("Añadido al carrito");
       return;
     }
 
@@ -113,10 +98,7 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeItem = async (productId: string) => {
-    if (!user) {
-      setItems(currentItems => currentItems.filter(item => item.product.id !== productId));
-      return;
-    }
+    if (!user) return;
 
     setIsLoading(true);
     try {
@@ -136,16 +118,7 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (!user) {
-      setItems(currentItems => 
-        currentItems.map(item => 
-          item.product.id === productId 
-            ? { ...item, quantity }
-            : item
-        )
-      );
-      return;
-    }
+    if (!user) return;
 
     try {
       setItems(currentItems => 
@@ -164,7 +137,6 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
   const clearCart = async () => {
     if (!user) {
       setItems([]);
-      localStorage.removeItem('skating-cart');
       return;
     }
 

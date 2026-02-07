@@ -4,15 +4,30 @@ import { useState } from "react";
 import { Product } from "@/types/skating-store";
 import { Button } from "@/components/ui/button";
 import { useSkatingCart } from "@/contexts/SkatingCartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export function ProductActions({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useSkatingCart();
+  const { user } = useAuth();
+  const router = useRouter();
 
   const handleAddToCart = () => {
+    if (!user) {
+      toast.error("Debes iniciar sesión para comprar", {
+        description: "Regístrate o inicia sesión para agregar productos al carrito.",
+        action: {
+          label: "Ir a Login",
+          onClick: () => router.push("/login"),
+        },
+      });
+      return;
+    }
+
     addItem(product, quantity);
-    toast.success(`${quantity}x ${product.name} added to cart`);
+    toast.success(`${quantity}x ${product.name} agregado al carrito`);
   };
 
   return (

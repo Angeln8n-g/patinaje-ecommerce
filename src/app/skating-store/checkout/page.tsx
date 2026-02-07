@@ -7,6 +7,7 @@ import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { createOrder, getProfile, updateProfile } from "@/lib/skating-store/supabase-queries";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { sendOrderNotification } from "@/lib/skating-store/notification-actions";
+import { createInAppNotification } from "@/lib/skating-store/in-app-notifications";
 import { ShippingInfo } from "@/types/skating-store";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -50,13 +51,22 @@ export default function CheckoutPage() {
       }
       const order = await createOrder(items, data, total, data.paymentMethod);
       
-      // Notificar al usuario que el pedido ha sido recibido
+      // Notificar al usuario que el pedido ha sido recibido (Email)
       try {
         await sendOrderNotification({
           orderId: order.id,
           customerName: data.fullName,
           customerEmail: user.email || "",
           status: 'RECEIVED'
+        });
+        
+        // Notificación In-App
+        await createInAppNotification({
+          user_id: user.id,
+          order_id: order.id,
+          title: "¡Pedido Recibido!",
+          message: `Tu pedido #${order.id.slice(0, 8)} ha sido recibido y está siendo procesado.`,
+          type: 'success'
         });
       } catch (notifError) {
         console.error("Error sending initial order notification:", notifError);

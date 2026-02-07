@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Truck, FileText } from "lucide-react";
+import { Loader2, Truck, FileText, Star } from "lucide-react"; // Import Star
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { formatCurrency } from "@/lib/utils";
 
@@ -182,12 +182,21 @@ export default function AdminOrdersPage() {
                                 <SelectValue placeholder="Selecciona..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {deliveryMen.map((dm) => (
-                                  <SelectItem key={dm.id} value={dm.id}>
-                                    {dm.email}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
+                              {deliveryMen.map((dm) => (
+                                <SelectItem key={dm.id} value={dm.id}>
+                                  <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
+                                    <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
+                                    {dm.avg_rating > 0 && (
+                                      <div className="flex items-center gap-1 text-yellow-500">
+                                        <Star className="w-3 h-3 fill-current" />
+                                        <span className="text-xs font-bold">{dm.avg_rating.toFixed(1)}</span>
+                                        <span className="text-xs text-muted-foreground">({dm.rating_count})</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
                             </Select>
                           </div>
                           <Button className="w-full" onClick={handleAssign} disabled={!selectedDeliveryMan}>

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Shipment, ShipmentStatus } from "@/types/skating-store";
 import { mapDbOrderToOrder, getOrderById } from "./supabase-queries";
 import { sendOrderNotification } from "./notification-actions";
+import { createInAppNotification } from "./in-app-notifications";
 
 export async function assignShipment(orderId: string, deliveryManId: string) {
   const supabase = await createClient();
@@ -69,15 +70,27 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
   if (success) {
     try {
       const order = await getOrderById(orderId);
-      if (order && order.shipping?.email) {
-        await sendOrderNotification({
-          orderId: order.id,
-          customerName: order.shipping.fullName,
-          customerEmail: order.shipping.email,
-          status: 'ASIGNADO',
-          deliveryName: deliveryName,
-          deliveryRating: 4.9 // Placeholder rating
+      if (order && order.user_id) {
+        // In-App Notification
+        await createInAppNotification({
+          user_id: order.user_id,
+          order_id: order.id,
+          title: "¡Repartidor Asignado!",
+          message: `${deliveryName} ha sido asignado para entregar tu pedido.`,
+          type: 'info'
         });
+
+        // Email Notification
+        if (order.shipping?.email) {
+          await sendOrderNotification({
+            orderId: order.id,
+            customerName: order.shipping.fullName,
+            customerEmail: order.shipping.email,
+            status: 'ASIGNADO',
+            deliveryName: deliveryName,
+            deliveryRating: 4.9 // Placeholder rating
+          });
+        }
       }
     } catch (notifError) {
       console.error("Error sending assignment notification:", notifError);
@@ -128,13 +141,47 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
   if (shipmentData && (status === 'EN_RUTA' || status === 'CERCA' || status === 'ENTREGADO')) {
     try {
       const order = mapDbOrderToOrder(shipmentData.order);
-      if (order && order.shipping?.email) {
-        await sendOrderNotification({
-          orderId: order.id,
-          customerName: order.shipping.fullName,
-          customerEmail: order.shipping.email,
-          status: status
+      
+      if (order && shipmentData.order.user_id) {
+        // In-App Notification Logic
+        let title = '';
+        let message = '';
+        let type: 'info' | 'success' | 'warning' = 'info';
+
+        switch (status) {
+          case 'EN_RUTA':
+            title = '¡Tu pedido va en camino!';
+            message = 'El repartidor ha iniciado el viaje hacia tu ubicación.';
+            break;
+          case 'CERCA':
+            title = '¡Repartidor Cerca!';
+            message = 'El repartidor está muy cerca de tu dirección.';
+            type = 'warning'; // Using warning color for attention
+            break;
+          case 'ENTREGADO':
+            title = '¡Pedido Entregado!';
+            message = 'Tu pedido ha sido entregado exitosamente. ¡Gracias por tu compra!';
+            type = 'success';
+            break;
+        }
+
+        await createInAppNotification({
+          user_id: shipmentData.order.user_id,
+          order_id: order.id,
+          title,
+          message,
+          type
         });
+
+        // Email Notification
+        if (order.shipping?.email) {
+          await sendOrderNotification({
+            orderId: order.id,
+            customerName: order.shipping.fullName,
+            customerEmail: order.shipping.email,
+            status: status
+          });
+        }
       }
     } catch (notifError) {
       console.error(`Error sending ${status} notification:`, notifError);
@@ -227,11 +274,35 @@ export async function getAllDeliveryMen() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email")
+    .select("id, email, first_name, last_name")
     .eq("role", "DELIVERY");
 
   if (error) return [];
-  return data;
+
+  // Fetch ratings for each delivery man
+  // This is not efficient for large datasets but works for now
+  // A better approach would be a database view or function
+  const deliveryMenWithRatings = await Promise.all(data.map(async (dm) => {
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('delivery_ratings')
+      .select('rating')
+      .eq('delivery_man_id', dm.id);
+      
+    let avgRating = 0;
+    if (ratings && ratings.length > 0) {
+      const sum = ratings.reduce((acc, curr) => acc + curr.rating, 0);
+      avgRating = sum / ratings.length;
+    }
+    
+    return {
+      ...dm,
+      avg_rating: avgRating,
+      rating_count: ratings?.length || 0
+    };
+  }));
+
+  // Sort by rating descending
+  return deliveryMenWithRatings.sort((a, b) => b.avg_rating - a.avg_rating);
 }
 
 export async function getDeliveryMenStats() {

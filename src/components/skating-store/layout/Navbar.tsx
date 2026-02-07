@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { CartIcon } from "./CartIcon";
+import { NotificationBell } from "./NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getStaticContentClient } from "@/lib/skating-store/supabase-queries";
 import { Input } from "@/components/ui/input";
@@ -217,6 +218,8 @@ export function Navbar() {
              </div>
              <span className="text-[10px] font-bold hidden md:inline">Cart</span>
           </div>
+
+          <NotificationBell />
 
           {user ? (
             <DropdownMenu>
