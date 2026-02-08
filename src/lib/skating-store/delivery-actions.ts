@@ -140,9 +140,14 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
   // Notify customer of status change
   if (shipmentData && (status === 'EN_RUTA' || status === 'CERCA' || status === 'ENTREGADO')) {
     try {
+      // Use maybeSingle to avoid errors if order is not found (though it should exist)
+      // The join in initial query returns an object, not array for single relation
       const order = mapDbOrderToOrder(shipmentData.order);
       
-      if (order && shipmentData.order.user_id) {
+      // Fix: shipmentData.order is an object from the join, user_id is directly on it
+      const userId = shipmentData.order.user_id;
+      
+      if (order && userId) {
         // In-App Notification Logic
         let title = '';
         let message = '';
@@ -166,7 +171,7 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
         }
 
         await createInAppNotification({
-          user_id: shipmentData.order.user_id,
+          user_id: userId,
           order_id: order.id,
           title,
           message,
@@ -174,14 +179,20 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
         });
 
         // Email Notification
-        if (order.shipping?.email) {
+        // Check if shipping info exists and has email
+        if (order.shipping && order.shipping.email) {
+          console.log(`Sending ${status} email to ${order.shipping.email}`);
           await sendOrderNotification({
             orderId: order.id,
             customerName: order.shipping.fullName,
             customerEmail: order.shipping.email,
             status: status
           });
+        } else {
+          console.log("Skipping email notification: No shipping email found");
         }
+      } else {
+        console.warn("Skipping notification: Order or UserID missing", { orderId: order?.id, userId });
       }
     } catch (notifError) {
       console.error(`Error sending ${status} notification:`, notifError);

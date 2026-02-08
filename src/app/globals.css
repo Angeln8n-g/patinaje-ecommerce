@@ -9,7 +9,7 @@
   }
   :root {
     /* Lime Green Theme - Updated based on reference */
-    --primary: oklch(0.88 0.24 110); /* #D7F000 approx - The bright lime button */
+    --primary: rgb(16, 244, 0); /* #D7F000 approx - The bright lime button */
     --primary-foreground: oklch(0.145 0 0); /* Black text on lime */
     
     --background: oklch(0.99 0 0); /* White/Near White */
