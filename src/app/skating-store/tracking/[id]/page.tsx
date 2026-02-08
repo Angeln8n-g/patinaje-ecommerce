@@ -76,6 +76,9 @@ export default function OrderTrackingPage() {
   const currentStepIndex = STEPS.findIndex(s => s.id === order.status);
   const isCashPayment = order.payment_method === 'cash';
   const isPaid = order.payment_status === 'paid';
+  // Allow showing QR if it's cash payment OR if it's not paid yet (regardless of method, as a fallback)
+  // Also, if order is delivered, we assume payment is done, so no QR needed.
+  const showQr = (isCashPayment || order.payment_method === 'card') && !isPaid && order.status !== 'delivered';
 
   return (
     <div className="container py-8 max-w-4xl mx-auto space-y-8">
@@ -153,8 +156,8 @@ export default function OrderTrackingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Payment QR Section */}
-            {isCashPayment && !isPaid && (
+            {/* Payment QR Section - Enhanced Logic */}
+            {showQr && (
               <Card className="border-2 border-primary/20 shadow-lg md:col-span-2 overflow-hidden bg-muted/5">
                 <CardHeader className="bg-primary/5 pb-4">
                   <div className="flex items-center gap-3">
@@ -162,8 +165,8 @@ export default function OrderTrackingPage() {
                       <QrCode className="h-6 w-6" />
                     </div>
                     <div>
-                      <CardTitle>Validación de Pago</CardTitle>
-                      <CardDescription>Muestra este código al repartidor para pagar en efectivo</CardDescription>
+                      <CardTitle>Validación de Entrega</CardTitle>
+                      <CardDescription>Muestra este código al repartidor para confirmar la recepción</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -178,10 +181,12 @@ export default function OrderTrackingPage() {
                   <div className="text-center space-y-2">
                     <div className="flex items-center justify-center gap-2 text-primary font-bold text-xl">
                       <Banknote className="h-6 w-6" />
-                      <span>Total a pagar: {formatCurrency(order.total)}</span>
+                      <span>
+                         {order.payment_method === 'cash' ? `Total a pagar: ${formatCurrency(order.total)}` : 'Pedido Pagado (Solo Confirmar)'}
+                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                      Este código es único para tu pedido. Una vez escaneado, el estado se actualizará automáticamente a "Entregado".
+                      Este código es único para tu pedido. Una vez escaneado, el estado se actualizará a "Entregado".
                     </p>
                   </div>
                 </CardContent>
