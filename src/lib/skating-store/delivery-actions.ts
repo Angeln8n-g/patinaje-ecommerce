@@ -40,6 +40,17 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
     .eq("order_id", orderId)
     .single();
 
+  // Get order coordinates for proximity detection
+  const { data: orderData } = await supabase
+    .from("skating_orders")
+    .select("customer_lat, customer_lng")
+    .eq("id", orderId)
+    .single();
+
+  const destCoords = (orderData?.customer_lat && orderData?.customer_lng)
+    ? { destination_lat: orderData.customer_lat, destination_lng: orderData.customer_lng }
+    : {};
+
   let success = false;
   if (existingShipment) {
     const { error } = await supabase
@@ -47,7 +58,8 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
       .update({ 
         delivery_man_id: deliveryManId,
         status: 'ASIGNADO',
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...destCoords
       })
       .eq("id", existingShipment.id);
       
@@ -59,7 +71,8 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
       .insert([{
         order_id: orderId,
         delivery_man_id: deliveryManId,
-        status: 'ASIGNADO'
+        status: 'ASIGNADO',
+        ...destCoords
       }]);
       
     if (error) throw new Error("Failed to assign shipment");
@@ -68,6 +81,12 @@ export async function assignShipment(orderId: string, deliveryManId: string) {
 
   // Notify customer
   if (success) {
+    // Sync order status to 'confirmed'
+    await supabase
+      .from("skating_orders")
+      .update({ status: 'confirmed' })
+      .eq("id", orderId);
+
     try {
       const order = await getOrderById(orderId);
       if (order && order.user_id) {
@@ -137,6 +156,23 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
     throw new Error("Failed to update shipment");
   }
 
+  // Sync order status with shipment status
+  if (shipmentData?.order?.id) {
+    const orderStatusMap: Record<string, string> = {
+      'ASIGNADO': 'confirmed',
+      'EN_RUTA': 'shipped',
+      'CERCA': 'shipped',
+      'ENTREGADO': 'delivered',
+    };
+    const newOrderStatus = orderStatusMap[status];
+    if (newOrderStatus) {
+      await supabase
+        .from("skating_orders")
+        .update({ status: newOrderStatus })
+        .eq("id", shipmentData.order.id);
+    }
+  }
+
   // Notify customer of status change
   if (shipmentData && (status === 'EN_RUTA' || status === 'CERCA' || status === 'ENTREGADO')) {
     try {
@@ -204,10 +240,10 @@ export async function updateShipmentStatus(shipmentId: string, status: ShipmentS
 
 export async function updateDeliveryLocation(shipmentId: string, lat: number, lng: number) {
   const supabase = await createClient();
-  
+
   const { error } = await supabase
     .from("shipments")
-    .update({ 
+    .update({
       current_lat: lat,
       current_lng: lng,
       updated_at: new Date().toISOString()
@@ -215,12 +251,57 @@ export async function updateDeliveryLocation(shipmentId: string, lat: number, ln
     .eq("id", shipmentId);
 
   if (error) {
-    console.error("Error updating location:", error);
-    throw new Error("Failed to update location");
+    // Don't throw — this runs in a background interval and throwing breaks the loop
+    console.warn("Error updating location (non-blocking):", error.message);
+    return { success: false };
+  }
+
+  // Auto-detect proximity: if EN_RUTA and close to destination, switch to CERCA
+  try {
+    const { data: shipment } = await supabase
+      .from("shipments")
+      .select(`*, order:skating_orders (*)`)
+      .eq("id", shipmentId)
+      .single();
+
+    if (shipment && shipment.status === 'EN_RUTA' && shipment.destination_lat && shipment.destination_lng) {
+      const distance = haversineDistance(
+        lat, lng,
+        Number(shipment.destination_lat), Number(shipment.destination_lng)
+      );
+
+      // If within 500 meters, auto-update to CERCA
+      if (distance <= 0.5) {
+        await updateShipmentStatus(shipmentId, 'CERCA' as ShipmentStatus, lat, lng);
+      }
+    }
+  } catch (proximityError) {
+    console.warn("Proximity check failed (non-blocking):", proximityError);
   }
 
   return { success: true };
 }
+
+
+/**
+ * Haversine formula to calculate distance between two coordinates in km.
+ */
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg: number): number {
+  return deg * (Math.PI / 180);
+}
+
 
 export async function getDeliveryShipments() {
   const supabase = await createClient();

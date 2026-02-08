@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getOrderById } from "@/lib/skating-store/supabase-queries";
 import { Order } from "@/types/skating-store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useParams } from "next/navigation";
 import { DeliveryRatingDialog } from "@/components/skating-store/rating/DeliveryRatingDialog";
 import { getOrderRating } from "@/lib/skating-store/rating-actions";
+import { createClient } from "@/lib/supabase/client";
 
 const STEPS = [
   { id: 'pending', label: 'Pendiente', icon: Clock },
@@ -29,29 +30,103 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [hasRated, setHasRated] = useState(false);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [statusToast, setStatusToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      const loadOrder = async () => {
-        try {
-          const data = await getOrderById(id);
-          setOrder(data);
-          
-          if (data && data.status === 'delivered') {
-             const rating = await getOrderRating(id);
-             if (rating) {
-               setHasRated(true);
-             }
+  const fetchOrder = useCallback(async () => {
+    if (!id) return;
+    try {
+      const data = await getOrderById(id);
+      setOrder(prev => {
+        // Show toast when status changes
+        if (prev && data && prev.status !== data.status) {
+          const step = STEPS.find(s => s.id === data.status);
+          if (step) {
+            toast.success(`Estado actualizado: ${step.label}`, {
+              icon: "🔔",
+            });
           }
-        } catch (error) {
-          console.error(error);
-        } finally {
-          setLoading(false);
         }
-      };
-      loadOrder();
+        return data;
+      });
+
+      if (data && data.status === 'delivered') {
+        const rating = await getOrderRating(id);
+        if (rating) setHasRated(true);
+      }
+    } catch (error) {
+      console.error(error);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const loadInitial = async () => {
+      await fetchOrder();
+      setLoading(false);
+    };
+    loadInitial();
+
+    // Subscribe to realtime changes on the order
+    const supabase = createClient();
+
+    const orderChannel = supabase
+      .channel(`tracking-order-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'skating_orders',
+          filter: `id=eq.${id}`
+        },
+        () => {
+          // Re-fetch order when it changes
+          fetchOrder();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to shipment changes for this order
+    const shipmentChannel = supabase
+      .channel(`tracking-shipment-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shipments',
+          filter: `order_id=eq.${id}`
+        },
+        () => {
+          fetchOrder();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to notifications for this order (triggers UI refresh)
+    const notifChannel = supabase
+      .channel(`tracking-notif-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'skating_notifications',
+          filter: `order_id=eq.${id}`
+        },
+        () => {
+          fetchOrder();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(orderChannel);
+      supabase.removeChannel(shipmentChannel);
+      supabase.removeChannel(notifChannel);
+    };
+  }, [id, fetchOrder]);
 
   if (loading) {
     return (
@@ -76,21 +151,19 @@ export default function OrderTrackingPage() {
   const currentStepIndex = STEPS.findIndex(s => s.id === order.status);
   const isCashPayment = order.payment_method === 'cash';
   const isPaid = order.payment_status === 'paid';
-  // Allow showing QR if it's cash payment OR if it's not paid yet (regardless of method, as a fallback)
-  // Also, if order is delivered, we assume payment is done, so no QR needed.
   const showQr = (isCashPayment || order.payment_method === 'card') && !isPaid && order.status !== 'delivered';
 
   return (
     <div className="container py-8 max-w-4xl mx-auto space-y-8">
       {order && order.status === 'delivered' && !hasRated && (
-        <DeliveryRatingDialog 
-          orderId={order.id} 
-          isOpen={showRatingDialog} 
+        <DeliveryRatingDialog
+          orderId={order.id}
+          isOpen={showRatingDialog}
           onOpenChange={setShowRatingDialog}
           onRatingSubmitted={() => setHasRated(true)}
         />
       )}
-      
+
       <div className="flex flex-col md:flex-row gap-8">
         <div className="flex-1 space-y-6">
           <div>
@@ -99,16 +172,16 @@ export default function OrderTrackingPage() {
             </h1>
             <div className="flex items-center gap-3">
               <p className="text-muted-foreground">ID: #{order.id.slice(0, 8)}</p>
-              <Badge className={cn("uppercase", 
+              <Badge className={cn("uppercase",
                 order.status === 'delivered' ? "bg-emerald-500 hover:bg-emerald-600" :
                 "bg-primary text-primary-foreground"
               )}>
                 {STEPS.find(s => s.id === order.status)?.label || order.status}
               </Badge>
-              
+
               {order.status === 'delivered' && (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant={hasRated ? "outline" : "default"}
                   className="ml-auto"
                   onClick={() => hasRated ? toast.info("Ya has valorado este pedido") : setShowRatingDialog(true)}
@@ -124,16 +197,16 @@ export default function OrderTrackingPage() {
           {/* Progress Bar */}
           <div className="relative pt-12 pb-8">
             <div className="absolute top-1/2 left-0 w-full h-1 bg-muted -translate-y-1/2 rounded-full" />
-            <div 
-              className="absolute top-1/2 left-0 h-1 bg-primary -translate-y-1/2 rounded-full transition-all duration-1000" 
-              style={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }}
+            <div
+              className="absolute top-1/2 left-0 h-1 bg-primary -translate-y-1/2 rounded-full transition-all duration-1000 ease-in-out"
+              style={{ width: `${(Math.max(0, currentStepIndex) / (STEPS.length - 1)) * 100}%` }}
             />
             <div className="relative flex justify-between">
               {STEPS.map((step, index) => {
                 const Icon = step.icon;
                 const isCompleted = index <= currentStepIndex;
                 const isCurrent = index === currentStepIndex;
-                
+
                 return (
                   <div key={step.id} className="flex flex-col items-center gap-3">
                     <div className={cn(
@@ -144,7 +217,7 @@ export default function OrderTrackingPage() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <span className={cn(
-                      "text-xs font-bold whitespace-nowrap",
+                      "text-xs font-bold whitespace-nowrap transition-colors duration-500",
                       isCompleted ? "text-primary" : "text-muted-foreground"
                     )}>
                       {step.label}
@@ -156,7 +229,7 @@ export default function OrderTrackingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Payment QR Section - Enhanced Logic */}
+            {/* Payment QR Section */}
             {showQr && (
               <Card className="border-2 border-primary/20 shadow-lg md:col-span-2 overflow-hidden bg-muted/5">
                 <CardHeader className="bg-primary/5 pb-4">
@@ -172,8 +245,8 @@ export default function OrderTrackingPage() {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center py-8 gap-6">
                   <div className="bg-white p-6 rounded-2xl shadow-inner border">
-                    <QRCodeSVG 
-                      value={JSON.stringify({ orderId: order.id, qrToken: order.qr_token })} 
+                    <QRCodeSVG
+                      value={JSON.stringify({ orderId: order.id, qrToken: order.qr_token })}
                       size={220}
                       level="H"
                     />
@@ -182,11 +255,11 @@ export default function OrderTrackingPage() {
                     <div className="flex items-center justify-center gap-2 text-primary font-bold text-xl">
                       <Banknote className="h-6 w-6" />
                       <span>
-                         {order.payment_method === 'cash' ? `Total a pagar: ${formatCurrency(order.total)}` : 'Pedido Pagado (Solo Confirmar)'}
+                        {order.payment_method === 'cash' ? `Total a pagar: ${formatCurrency(order.total)}` : 'Pedido Pagado (Solo Confirmar)'}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                      Este código es único para tu pedido. Una vez escaneado, el estado se actualizará a "Entregado".
+                      Este código es único para tu pedido. Una vez escaneado, el estado se actualizará a &quot;Entregado&quot;.
                     </p>
                   </div>
                 </CardContent>

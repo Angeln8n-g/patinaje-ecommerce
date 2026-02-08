@@ -118,24 +118,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear state immediately for instant UI feedback
+    setUser(null);
+    setRole(null);
+    setIsAdmin(false);
+    setIsDelivery(false);
+
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) console.error("Error signing out:", error);
+      await supabase.auth.signOut();
     } catch (error) {
-      console.error("Unexpected error signing out:", error);
-    } finally {
-      // Force clear local state regardless of server response
-      setUser(null);
-      setRole(null);
-      setIsAdmin(false);
-      setIsDelivery(false);
-      
-      // Optional: Clear any local storage if used
-      // localStorage.clear(); 
-      
-      // Force refresh to clear any server-side cookies that might be stuck
-      window.location.href = '/login';
+      console.error("Error signing out:", error);
     }
+    // Navigation is handled by the caller (Navbar, Sidebar, etc.)
+    // onAuthStateChange will also fire SIGNED_OUT to confirm cleanup
   };
 
   return (

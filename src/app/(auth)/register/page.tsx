@@ -54,7 +54,7 @@ export default function RegisterPage() {
         email: values.email,
         password: values.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/skating-store`,
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
         },
       });
 

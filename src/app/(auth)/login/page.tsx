@@ -63,7 +63,6 @@ export default function LoginPage() {
 
       toast.success("¡Bienvenido de nuevo!");
       router.push("/skating-store");
-      router.refresh();
     } catch (error: any) {
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 500);

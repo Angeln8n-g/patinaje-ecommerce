@@ -93,7 +93,7 @@ function DeliveryAuthCheck({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => signOut()} className="hover:text-destructive">
+        <Button variant="ghost" size="sm" onClick={async () => { await signOut(); router.push('/skating-store'); }} className="hover:text-destructive">
           <LogOut className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Cerrar Sesión</span>
         </Button>

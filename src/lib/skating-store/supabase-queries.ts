@@ -199,7 +199,7 @@ export async function createOrder(items: CartItem[], shipping: ShippingInfo, tot
   // Get current user to link the order
   const { data: { user } } = await supabase.auth.getUser();
 
-  const orderData = {
+  const orderData: Record<string, unknown> = {
     customer_name: shipping.fullName,
     customer_address: shipping.address,
     customer_city: shipping.city,
@@ -211,7 +211,9 @@ export async function createOrder(items: CartItem[], shipping: ShippingInfo, tot
     status: 'pending',
     payment_method: paymentMethod,
     payment_status: 'pending',
-    user_id: user?.id || null // Link order to user if authenticated
+    user_id: user?.id || null,
+    ...(shipping.lat != null && { customer_lat: shipping.lat }),
+    ...(shipping.lng != null && { customer_lng: shipping.lng }),
   };
 
   const { data, error } = await supabase

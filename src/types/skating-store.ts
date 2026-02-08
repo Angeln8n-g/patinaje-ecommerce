@@ -82,6 +82,8 @@ export interface ShippingInfo {
   postalCode: string;
   phone: string;
   email?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Order {

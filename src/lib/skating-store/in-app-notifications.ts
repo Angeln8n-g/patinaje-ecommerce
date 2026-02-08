@@ -14,31 +14,29 @@ export interface InAppNotification {
 }
 
 export async function createInAppNotification(notification: Omit<InAppNotification, 'id' | 'created_at' | 'is_read'>) {
+  // Try Service Role first (bypasses RLS — needed when delivery/admin inserts for another user)
+  try {
+    const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+    const serviceClient = createServiceRoleClient();
+
+    const { error } = await serviceClient
+      .from('skating_notifications')
+      .insert([{ ...notification, is_read: false }]);
+
+    if (!error) return;
+    console.warn('Service role insert failed, falling back to authenticated client:', error.message);
+  } catch {
+    // Service role key not configured — fall through to authenticated client
+  }
+
+  // Fallback: use authenticated client (works for self-notifications via RLS policy)
   const supabase = await createClient();
-  
-  // We use the authenticated client. 
-  // If the user (e.g. delivery man) triggers this, they might not have RLS permission to insert for another user.
-  // So we might need to use a Service Role client here or ensure RLS allows it.
-  // For now, let's assume we are using standard client and if it fails, we'll need to upgrade permissions.
-  // Actually, standard practice: use service role for system notifications.
-  
-  // However, in this project structure, `createClient` usually returns user client.
-  // Let's try to use the current client and if needed we can make a policy.
-  // The policy: "Enable insert for authenticated users" is risky if they can spam others.
-  // Best: Policy "Enable insert for authenticated users where role is admin/delivery" OR "Service Role".
-  
-  // Let's stick to simple insert first.
   const { error } = await supabase
     .from('skating_notifications')
-    .insert([{
-      ...notification,
-      is_read: false
-    }]);
+    .insert([{ ...notification, is_read: false }]);
 
   if (error) {
     console.error('Error creating notification:', error);
-    // Fallback: try with service role if available in env (usually not exposed to client actions directly securely without checks)
-    // But since this is a server action, we COULD use service role if we initialize it.
   }
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User, Mail, ShieldCheck, LogOut, Phone, MapPin, Star, AlertTriangle, TrendingUp, Award } from "lucide-react";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 export default function DeliveryProfilePage() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
@@ -140,7 +142,7 @@ export default function DeliveryProfilePage() {
              <Button 
                variant="destructive" 
                className="w-full h-12 rounded-xl font-bold shadow-lg shadow-destructive/20" 
-               onClick={() => signOut()}
+               onClick={async () => { await signOut(); router.push('/skating-store'); }}
              >
                <LogOut className="mr-2 h-5 w-5" />
                Cerrar Sesión

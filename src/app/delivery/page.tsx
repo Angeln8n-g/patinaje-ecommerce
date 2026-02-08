@@ -96,7 +96,11 @@ export default function DeliveryDashboard() {
             // To avoid spamming, we could pick the first active one or update all.
             // Let's update the first one for simplicity or iterate.
             for (const shipment of activeShipments) {
-               await updateDeliveryLocation(shipment.id, latitude, longitude);
+               try {
+                 await updateDeliveryLocation(shipment.id, latitude, longitude);
+               } catch {
+                 // Individual shipment update failed — continue with others
+               }
             }
           },
           (error) => {
