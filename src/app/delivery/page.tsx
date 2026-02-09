@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { getDeliveryShipments, updateDeliveryLocation } from "@/lib/skating-store/delivery-actions";
+import { getDeliveryShipments, updateDeliveryLocation, updateDeliveryManLocation } from "@/lib/skating-store/delivery-actions";
 import { ShipmentCard } from "@/components/delivery/ShipmentCard";
-import { Loader2, Package, Truck, AlertCircle } from "lucide-react";
+import { Loader2, Package, Truck, AlertCircle, MapPinOff } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { mapDbOrderToOrder } from "@/lib/skating-store/supabase-queries";
@@ -21,6 +21,7 @@ export default function DeliveryDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [newOrderPopupOpen, setNewOrderPopupOpen] = useState(false);
   const [newOrderData, setNewOrderData] = useState<any>(null);
+  const [geolocationDenied, setGeolocationDenied] = useState(false);
   const previousShipmentsLength = useRef(0);
   const supabase = createClient();
 
@@ -79,9 +80,59 @@ export default function DeliveryDashboard() {
     };
   }, []);
 
-  // Location tracking effect
+  // Independent GPS tracking: send location to delivery_locations every 15 seconds
+  // This runs regardless of whether the delivery person has active shipments (Req 4.1, 6.1)
   useEffect(() => {
-    // Only track if there are active shipments
+    if (!navigator.geolocation) {
+      setGeolocationDenied(true);
+      return;
+    }
+
+    // Check initial permission state
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: "geolocation" }).then((result) => {
+        setGeolocationDenied(result.state === "denied");
+        result.addEventListener("change", () => {
+          setGeolocationDenied(result.state === "denied");
+        });
+      }).catch(() => {
+        // permissions API not supported, we'll detect denial via getCurrentPosition error
+      });
+    }
+
+    const sendLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setGeolocationDenied(false);
+          try {
+            await updateDeliveryManLocation(latitude, longitude);
+          } catch (error) {
+            // Network error: log but don't interrupt the interval (Req: error handling)
+            console.error("Error sending location to delivery_locations:", error);
+          }
+        },
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            setGeolocationDenied(true);
+          }
+          console.warn("Geolocation error:", error.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    };
+
+    // Send location immediately on mount
+    sendLocation();
+
+    // Then every 15 seconds
+    const intervalId = setInterval(sendLocation, 15000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Location tracking for active shipments (updates shipment records)
+  useEffect(() => {
     const activeShipments = shipments.filter(s => s.status === 'EN_RUTA' || s.status === 'CERCA');
     
     if (activeShipments.length === 0) return;
@@ -91,10 +142,6 @@ export default function DeliveryDashboard() {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
-            // Update location for all active shipments (or ideally just update the delivery man's location in a separate table, 
-            // but for this schema we update the shipments)
-            // To avoid spamming, we could pick the first active one or update all.
-            // Let's update the first one for simplicity or iterate.
             for (const shipment of activeShipments) {
                try {
                  await updateDeliveryLocation(shipment.id, latitude, longitude);
@@ -104,12 +151,12 @@ export default function DeliveryDashboard() {
             }
           },
           (error) => {
-            console.warn("Location tracking error:", error);
+            console.warn("Shipment location tracking error:", error);
           },
           { enableHighAccuracy: true }
         );
       }
-    }, 30000); // Update every 30 seconds
+    }, 30000);
 
     return () => clearInterval(intervalId);
   }, [shipments]);
@@ -124,6 +171,18 @@ export default function DeliveryDashboard() {
 
   return (
     <div className="space-y-6 pb-8">
+      {geolocationDenied && (
+        <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+          <MapPinOff className="h-5 w-5 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium text-sm">Rastreo de ubicación no disponible</p>
+            <p className="text-xs mt-1 opacity-80">
+              Los permisos de geolocalización están denegados. Para que el sistema pueda rastrear tu ubicación y asignarte pedidos cercanos, habilita los permisos de ubicación en la configuración de tu navegador.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10 text-primary">

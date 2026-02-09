@@ -1,10 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { Shipment, ShipmentStatus } from "@/types/skating-store";
+import { Shipment, ShipmentStatus, DeliveryLocation } from "@/types/skating-store";
 import { mapDbOrderToOrder, getOrderById } from "./supabase-queries";
 import { sendOrderNotification } from "./notification-actions";
 import { createInAppNotification } from "./in-app-notifications";
+import { haversineDistance } from "./geo-utils";
 
 export async function assignShipment(orderId: string, deliveryManId: string) {
   const supabase = await createClient();
@@ -283,26 +284,6 @@ export async function updateDeliveryLocation(shipmentId: string, lat: number, ln
 }
 
 
-/**
- * Haversine formula to calculate distance between two coordinates in km.
- */
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth radius in km
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function toRad(deg: number): number {
-  return deg * (Math.PI / 180);
-}
-
-
 export async function getDeliveryShipments() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -499,4 +480,191 @@ export async function getAllOrdersWithShipment() {
   }));
 
   return transformedData;
+}
+
+
+// ─── Delivery Location Tracking (delivery_locations table) ──────────────────
+
+/**
+ * Upserts the authenticated delivery man's location in the `delivery_locations`
+ * table. Since `delivery_man_id` has a UNIQUE constraint, this performs an
+ * insert on first call and an update on subsequent calls.
+ *
+ * The delivery_man_id is derived from the authenticated user (auth.uid()).
+ *
+ * @param lat - Latitude of the delivery man's current position.
+ * @param lng - Longitude of the delivery man's current position.
+ * @returns `{ success: true }` on success, `{ success: false }` on failure.
+ */
+export async function updateDeliveryManLocation(
+  lat: number,
+  lng: number
+): Promise<{ success: boolean }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    console.warn("updateDeliveryManLocation: No authenticated user");
+    return { success: false };
+  }
+
+  const { error } = await supabase
+    .from("delivery_locations")
+    .upsert(
+      {
+        delivery_man_id: user.id,
+        lat,
+        lng,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "delivery_man_id" }
+    );
+
+  if (error) {
+    console.warn("Error upserting delivery man location (non-blocking):", error.message);
+    return { success: false };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Retrieves all delivery locations with the delivery man's profile info
+ * (name, email). Intended for admin use.
+ *
+ * @returns Array of delivery locations enriched with profile data.
+ */
+export async function getDeliveryMenLocations(): Promise<
+  Array<DeliveryLocation & { first_name: string | null; last_name: string | null; email: string }>
+> {
+  const supabase = await createClient();
+
+  // Verify admin role
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "ADMIN") return [];
+
+  const { data, error } = await supabase
+    .from("delivery_locations")
+    .select(`
+      *,
+      profile:profiles!delivery_man_id (
+        first_name,
+        last_name,
+        email
+      )
+    `)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching delivery men locations:", error);
+    return [];
+  }
+
+  // Flatten the profile join into the top-level object
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    delivery_man_id: row.delivery_man_id,
+    lat: Number(row.lat),
+    lng: Number(row.lng),
+    updated_at: row.updated_at,
+    first_name: row.profile?.first_name ?? null,
+    last_name: row.profile?.last_name ?? null,
+    email: row.profile?.email ?? "",
+  }));
+}
+
+/**
+ * Queries all delivery locations, calculates the Haversine distance from each
+ * delivery man to the given store coordinates, and returns them sorted by
+ * distance ascending (nearest first).
+ *
+ * Includes the delivery man's profile info (name) and the distance in km.
+ *
+ * @param storeLat - Latitude of the store.
+ * @param storeLng - Longitude of the store.
+ * @returns Array of delivery men with distance, sorted nearest-first.
+ */
+export async function getNearestDeliveryMen(
+  storeLat: number,
+  storeLng: number
+): Promise<
+  Array<{
+    delivery_man_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+    lat: number;
+    lng: number;
+    updated_at: string;
+    distance_km: number;
+  }>
+> {
+  const supabase = await createClient();
+
+  // Verify admin role
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "ADMIN") return [];
+
+  const { data, error } = await supabase
+    .from("delivery_locations")
+    .select(`
+      *,
+      profile:profiles!delivery_man_id (
+        first_name,
+        last_name,
+        email
+      )
+    `);
+
+  if (error) {
+    console.error("Error fetching delivery locations for nearest:", error);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  // Calculate distance for each delivery man and sort ascending
+  const withDistance = data.map((row: any) => {
+    const dlLat = Number(row.lat);
+    const dlLng = Number(row.lng);
+    const distance_km = haversineDistance(storeLat, storeLng, dlLat, dlLng);
+
+    return {
+      delivery_man_id: row.delivery_man_id as string,
+      first_name: (row.profile?.first_name as string | null) ?? null,
+      last_name: (row.profile?.last_name as string | null) ?? null,
+      email: (row.profile?.email as string) ?? "",
+      lat: dlLat,
+      lng: dlLng,
+      updated_at: row.updated_at as string,
+      distance_km,
+    };
+  });
+
+  // Sort by distance ascending (nearest first)
+  withDistance.sort((a, b) => a.distance_km - b.distance_km);
+
+  return withDistance;
 }

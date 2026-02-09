@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -11,7 +13,22 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button as UIButton } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Banknote } from "lucide-react";
+import { CreditCard, Banknote, Loader2 } from "lucide-react";
+import type { DeliveryLocationResult } from "./DeliveryLocationPicker";
+
+// Dynamically import the map component with SSR disabled (Leaflet requires browser APIs)
+const DeliveryLocationPicker = dynamic(
+  () => import("./DeliveryLocationPicker"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-4 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        Cargando mapa...
+      </div>
+    ),
+  }
+);
 
 const formSchema = z.object({
   fullName: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -31,6 +48,9 @@ interface CheckoutFormProps {
 }
 
 export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onLogin }: CheckoutFormProps) {
+  // Delivery location state from map picker
+  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocationResult | null>(null);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -42,6 +62,26 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
       paymentMethod: "card",
     },
   });
+
+  const handleLocationChange = useCallback((result: DeliveryLocationResult | null) => {
+    setDeliveryLocation(result);
+  }, []);
+
+  // Determine if the submit button should be blocked:
+  // - If a location was selected but it's outside all zones, block submit
+  // - If no location was selected yet (and the map is shown), we don't block
+  //   because the map might not render (graceful degradation when no zones exist)
+  const isOutsideZone = deliveryLocation !== null && !deliveryLocation.inZone;
+
+  const handleFormSubmit = async (data: z.infer<typeof formSchema>) => {
+    // Include delivery coordinates in the shipping info if available
+    const shippingData: ShippingInfo & { paymentMethod: 'card' | 'cash' } = {
+      ...data,
+      lat: deliveryLocation?.lat,
+      lng: deliveryLocation?.lng,
+    };
+    await onSubmit(shippingData);
+  };
 
   return (
     <Form {...form}>
@@ -55,7 +95,7 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
           </Alert>
         )}
       </div>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="fullName"
@@ -124,6 +164,14 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
           )}
         />
 
+        {/* Delivery Location Map Picker */}
+        <div className="pt-4 border-t">
+          <DeliveryLocationPicker
+            onLocationChange={handleLocationChange}
+            disabled={disabled}
+          />
+        </div>
+
         <div className="pt-4 border-t">
           <h3 className="text-lg font-semibold mb-4">Método de Pago</h3>
           <FormField
@@ -181,7 +229,12 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
         </div>
 
         {!disabled && (
-          <Button type="submit" className="w-full mt-6" size="lg" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="w-full mt-6"
+            size="lg"
+            disabled={isLoading || isOutsideZone}
+          >
             {isLoading ? "Procesando..." : "Confirmar Pedido"}
           </Button>
         )}

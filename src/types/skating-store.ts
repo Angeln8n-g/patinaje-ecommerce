@@ -148,3 +148,26 @@ export interface Review {
   comment: string;
   created_at: string;
 }
+
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  polygon: Array<{ lat: number; lng: number }>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryLocation {
+  id: string;
+  delivery_man_id: string;
+  lat: number;
+  lng: number;
+  updated_at: string;
+}
+
+export interface StoreLocation {
+  lat: number;
+  lng: number;
+  address: string;
+}

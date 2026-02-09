@@ -1,20 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllOrdersWithShipment, getAllDeliveryMen, assignShipment } from "@/lib/skating-store/delivery-actions";
+import { getAllOrdersWithShipment, getAllDeliveryMen, assignShipment, getNearestDeliveryMen } from "@/lib/skating-store/delivery-actions";
+import { getStoreLocation } from "@/lib/skating-store/zone-actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Truck, FileText, Star } from "lucide-react"; // Import Star
+import { Loader2, Truck, FileText, Star, AlertTriangle, MapPin } from "lucide-react";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { formatCurrency } from "@/lib/utils";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [deliveryMen, setDeliveryMen] = useState<any[]>([]);
+  const [nearestDeliveryMen, setNearestDeliveryMen] = useState<any[]>([]);
+  const [noLocationWarning, setNoLocationWarning] = useState(false);
+  const [storeLocationMissing, setStoreLocationMissing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [selectedDeliveryMan, setSelectedDeliveryMan] = useState<string>("");
@@ -30,12 +35,29 @@ export default function AdminOrdersPage() {
     setIsRefreshing(true);
     
     try {
-      // Execute sequentially or handle errors individually if needed
       const ordersData = await getAllOrdersWithShipment();
       const deliveryMenData = await getAllDeliveryMen();
       
       setOrders(ordersData || []);
       setDeliveryMen(deliveryMenData || []);
+      
+      // Load store location and nearest delivery men sorted by distance
+      const storeLocation = await getStoreLocation();
+      if (storeLocation && storeLocation.lat && storeLocation.lng) {
+        setStoreLocationMissing(false);
+        const nearest = await getNearestDeliveryMen(storeLocation.lat, storeLocation.lng);
+        setNearestDeliveryMen(nearest);
+        // If there are delivery men but none have known locations, show warning
+        if ((deliveryMenData || []).length > 0 && nearest.length === 0) {
+          setNoLocationWarning(true);
+        } else {
+          setNoLocationWarning(false);
+        }
+      } else {
+        setStoreLocationMissing(true);
+        setNearestDeliveryMen([]);
+        setNoLocationWarning(false);
+      }
       
       const count = (ordersData || []).filter((o: any) => !o.shipment).length;
       
@@ -45,7 +67,6 @@ export default function AdminOrdersPage() {
       
       setUnassignedCount(count);
     } catch (error: any) {
-      // Ignore abort errors which are common during navigation/HMR
       if (error?.name !== 'AbortError') {
         console.error("Error loading admin data:", error);
         toast.error("Error al cargar datos");
@@ -172,32 +193,73 @@ export default function AdminOrdersPage() {
                           <DialogTitle>Asignar Repartidor</DialogTitle>
                         </DialogHeader>
                         <div className="py-4 space-y-4">
+                          {noLocationWarning && (
+                            <Alert variant="destructive">
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertTitle>Sin ubicación conocida</AlertTitle>
+                              <AlertDescription>
+                                No se puede determinar la cercanía de los repartidores. Ningún repartidor tiene ubicación conocida.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          {storeLocationMissing && (
+                            <Alert>
+                              <MapPin className="h-4 w-4" />
+                              <AlertTitle>Ubicación de tienda no configurada</AlertTitle>
+                              <AlertDescription>
+                                Configure la ubicación de la tienda en Zonas de Entrega para ver las distancias de los repartidores.
+                              </AlertDescription>
+                            </Alert>
+                          )}
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Seleccionar Repartidor</label>
-                            <Select 
-                              onValueChange={setSelectedDeliveryMan} 
-                              value={selectedDeliveryMan}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecciona..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                              {deliveryMen.map((dm) => (
-                                <SelectItem key={dm.id} value={dm.id}>
-                                  <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
-                                    <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
-                                    {dm.avg_rating > 0 && (
-                                      <div className="flex items-center gap-1 text-yellow-500">
-                                        <Star className="w-3 h-3 fill-current" />
-                                        <span className="text-xs font-bold">{dm.avg_rating.toFixed(1)}</span>
-                                        <span className="text-xs text-muted-foreground">({dm.rating_count})</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                            </Select>
+                            {nearestDeliveryMen.length > 0 ? (
+                              <Select 
+                                onValueChange={setSelectedDeliveryMan} 
+                                value={selectedDeliveryMan}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                {nearestDeliveryMen.map((dm) => (
+                                  <SelectItem key={dm.delivery_man_id} value={dm.delivery_man_id}>
+                                    <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
+                                      <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
+                                      <span className="text-xs text-muted-foreground font-medium">
+                                        — {dm.distance_km.toFixed(1)} km
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Select 
+                                onValueChange={setSelectedDeliveryMan} 
+                                value={selectedDeliveryMan}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                {deliveryMen.map((dm) => (
+                                  <SelectItem key={dm.id} value={dm.id}>
+                                    <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
+                                      <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
+                                      {dm.avg_rating > 0 && (
+                                        <div className="flex items-center gap-1 text-yellow-500">
+                                          <Star className="w-3 h-3 fill-current" />
+                                          <span className="text-xs font-bold">{dm.avg_rating.toFixed(1)}</span>
+                                          <span className="text-xs text-muted-foreground">({dm.rating_count})</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                </SelectContent>
+                              </Select>
+                            )}
                           </div>
                           <Button className="w-full" onClick={handleAssign} disabled={!selectedDeliveryMan}>
                             Confirmar Asignación

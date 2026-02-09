@@ -50,16 +50,19 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Capture customer location for delivery proximity detection
+      // Use coordinates from the delivery map picker if available;
+      // otherwise fall back to browser geolocation for proximity detection
       let shippingWithCoords = { ...data };
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-        });
-        shippingWithCoords.lat = position.coords.latitude;
-        shippingWithCoords.lng = position.coords.longitude;
-      } catch {
-        // Location not available — proximity detection won't work but order proceeds
+      if (!shippingWithCoords.lat || !shippingWithCoords.lng) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          });
+          shippingWithCoords.lat = position.coords.latitude;
+          shippingWithCoords.lng = position.coords.longitude;
+        } catch {
+          // Location not available — proximity detection won't work but order proceeds
+        }
       }
 
       const order = await createOrder(items, shippingWithCoords, total, data.paymentMethod);
