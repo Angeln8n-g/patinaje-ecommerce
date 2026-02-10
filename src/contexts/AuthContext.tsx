@@ -11,6 +11,7 @@ interface AuthContextType {
   role: UserRole | null;
   isAdmin: boolean;
   isDelivery: boolean;
+  isSeller: boolean;
   isLoading: boolean;
   signOut: () => Promise<void>;
 }
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDelivery, setIsDelivery] = useState(false);
+  const [isSeller, setIsSeller] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
 
@@ -45,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setRole(null);
             setIsAdmin(false);
             setIsDelivery(false);
+            setIsSeller(false);
           }
           return;
         }
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setRole(null);
           setIsAdmin(false);
           setIsDelivery(false);
+          setIsSeller(false);
         }
       } catch (error) {
         console.error("Error checking auth:", error);
@@ -76,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setIsAdmin(false);
         setIsDelivery(false);
+        setIsSeller(false);
       } else if (session?.user) {
         setUser(session.user);
         await checkRole(session.user.id);
@@ -84,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setIsAdmin(false);
         setIsDelivery(false);
+        setIsSeller(false);
       }
       setIsLoading(false);
     });
@@ -104,16 +110,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(userRole);
         setIsAdmin(userRole === 'ADMIN');
         setIsDelivery(userRole === 'DELIVERY');
+        setIsSeller(userRole === 'SELLER');
       } else {
         setRole('USER');
         setIsAdmin(false);
         setIsDelivery(false);
+        setIsSeller(false);
       }
     } catch (error) {
       console.error("Error checking role:", error);
       setRole(null);
       setIsAdmin(false);
       setIsDelivery(false);
+      setIsSeller(false);
     }
   };
 
@@ -123,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
     setIsAdmin(false);
     setIsDelivery(false);
+    setIsSeller(false);
 
     try {
       await supabase.auth.signOut();
@@ -134,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, isAdmin, isDelivery, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, role, isAdmin, isDelivery, isSeller, isLoading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

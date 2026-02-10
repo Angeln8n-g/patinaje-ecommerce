@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { getAllOrdersWithShipment, getAllDeliveryMen, assignShipment, getNearestDeliveryMen } from "@/lib/skating-store/delivery-actions";
 import { getStoreLocation } from "@/lib/skating-store/zone-actions";
+import { getSellers } from "@/lib/skating-store/user-actions";
+import { assignOrderToSeller } from "@/lib/skating-store/admin-actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Truck, FileText, Star, AlertTriangle, MapPin } from "lucide-react";
+import { Loader2, Truck, FileText, Star, AlertTriangle, MapPin, UserCheck } from "lucide-react";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { formatCurrency } from "@/lib/utils";
 
@@ -28,6 +30,14 @@ export default function AdminOrdersPage() {
   const [unassignedCount, setUnassignedCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Seller assignment state
+  const [sellersList, setSellersList] = useState<any[]>([]);
+  const [sellerAssignOpen, setSellerAssignOpen] = useState(false);
+  const [sellerAssignOrderId, setSellerAssignOrderId] = useState<string | null>(null);
+  const [sellerAssignOrderSellerId, setSellerAssignOrderSellerId] = useState<string | null>(null);
+  const [selectedSellerId, setSelectedSellerId] = useState<string>("");
+  const [confirmReassign, setConfirmReassign] = useState(false);
+
   const loadData = async (silent = false) => {
     if (isRefreshing) return;
     
@@ -37,9 +47,11 @@ export default function AdminOrdersPage() {
     try {
       const ordersData = await getAllOrdersWithShipment();
       const deliveryMenData = await getAllDeliveryMen();
+      const sellersData = await getSellers();
       
       setOrders(ordersData || []);
       setDeliveryMen(deliveryMenData || []);
+      setSellersList(sellersData || []);
       
       // Load store location and nearest delivery men sorted by distance
       const storeLocation = await getStoreLocation();
@@ -123,6 +135,36 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const handleOpenSellerAssign = (order: any) => {
+    setSellerAssignOrderId(order.id);
+    setSellerAssignOrderSellerId(order.seller_id || null);
+    setSelectedSellerId("");
+    setConfirmReassign(false);
+    setSellerAssignOpen(true);
+  };
+
+  const handleAssignToSeller = async () => {
+    if (!sellerAssignOrderId || !selectedSellerId) return;
+
+    // If order already has a seller and we're assigning a different one, require confirmation
+    if (sellerAssignOrderSellerId && sellerAssignOrderSellerId !== selectedSellerId && !confirmReassign) {
+      setConfirmReassign(true);
+      return;
+    }
+
+    try {
+      await assignOrderToSeller(sellerAssignOrderId, selectedSellerId);
+      toast.success("Pedido asignado al vendedor correctamente");
+      setSellerAssignOpen(false);
+      setSellerAssignOrderId(null);
+      setSelectedSellerId("");
+      setConfirmReassign(false);
+      await loadData(true);
+    } catch (error) {
+      toast.error("Error al asignar pedido al vendedor");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-10">
@@ -146,6 +188,7 @@ export default function AdminOrdersPage() {
               <TableHead>Cliente</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Estado Pedido</TableHead>
+              <TableHead>Vendedor</TableHead>
               <TableHead>Estado Envío</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
@@ -165,6 +208,20 @@ export default function AdminOrdersPage() {
                   <Badge variant={order.status === 'pending' ? 'outline' : 'default'}>
                     {order.status}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {order.seller_id ? (
+                    <span className="text-sm">
+                      {sellersList.find((s: any) => s.id === order.seller_id)
+                        ? (() => {
+                            const s = sellersList.find((s: any) => s.id === order.seller_id);
+                            return s.first_name ? `${s.first_name} ${s.last_name || ""}`.trim() : s.email;
+                          })()
+                        : order.seller_id.slice(0, 8)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Sin asignar</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   {order.shipment ? (
@@ -276,6 +333,15 @@ export default function AdminOrdersPage() {
                     >
                       <FileText className="h-4 w-4" />
                     </Button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenSellerAssign(order)}
+                      title="Asignar Vendedor"
+                    >
+                      <UserCheck className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -297,6 +363,61 @@ export default function AdminOrdersPage() {
             </p>
             <Button onClick={() => setAssignmentPopupOpen(false)} className="w-full">
               Revisar Lista
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Seller Assignment Dialog */}
+      <Dialog open={sellerAssignOpen} onOpenChange={(open) => {
+        setSellerAssignOpen(open);
+        if (!open) {
+          setConfirmReassign(false);
+          setSelectedSellerId("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar Pedido a Vendedor</DialogTitle>
+            {sellerAssignOrderSellerId && (
+              <DialogDescription>
+                Este pedido ya está asignado a un vendedor. Selecciona otro para reasignar.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Seleccionar Vendedor</label>
+              <Select onValueChange={setSelectedSellerId} value={selectedSellerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un vendedor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {sellersList.map((seller: any) => (
+                    <SelectItem key={seller.id} value={seller.id}>
+                      {seller.first_name
+                        ? `${seller.first_name} ${seller.last_name || ""}`.trim()
+                        : seller.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {confirmReassign && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Confirmar reasignación</AlertTitle>
+                <AlertDescription>
+                  Este pedido ya está asignado a otro vendedor. ¿Deseas reasignarlo?
+                </AlertDescription>
+              </Alert>
+            )}
+            <Button
+              className="w-full"
+              onClick={handleAssignToSeller}
+              disabled={!selectedSellerId}
+            >
+              {confirmReassign ? "Confirmar Reasignación" : "Asignar Vendedor"}
             </Button>
           </div>
         </DialogContent>

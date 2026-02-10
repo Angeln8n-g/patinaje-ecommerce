@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode } from "lucide-react";
+import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode, UserCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
@@ -57,6 +57,11 @@ const navItems = [
     title: "Repartidores",
     href: "/admin/deliveries",
     icon: Truck,
+  },
+  {
+    title: "Vendedores",
+    href: "/admin/sellers",
+    icon: UserCheck,
   },
   {
     title: "Zonas de Entrega",

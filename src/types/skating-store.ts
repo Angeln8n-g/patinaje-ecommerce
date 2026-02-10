@@ -96,6 +96,9 @@ export interface Order {
   payment_method: 'card' | 'cash';
   payment_status: 'pending' | 'paid' | 'failed';
   qr_token?: string;
+  seller_id?: string;
+  order_type?: 'online' | 'in_store';
+  dispatched_at?: string;
   created_at: string;
 }
 
@@ -113,7 +116,7 @@ export interface Shipment {
   updated_at: string;
 }
 
-export type UserRole = 'USER' | 'ADMIN' | 'DELIVERY';
+export type UserRole = 'USER' | 'ADMIN' | 'DELIVERY' | 'SELLER';
 
 export interface Profile {
   id: string;
@@ -171,3 +174,83 @@ export interface StoreLocation {
   lng: number;
   address: string;
 }
+
+
+export interface PosSession {
+  id: string;
+  seller_id: string;
+  initial_amount: number;
+  reported_amount: number | null;
+  expected_amount: number | null;
+  total_sales: number;
+  total_card_sales: number;
+  total_cash_sales: number;
+  transaction_count: number;
+  status: 'open' | 'closed';
+  opened_at: string;
+  closed_at: string | null;
+}
+
+export interface CashSessionSummary {
+  total_sales: number;
+  total_card_sales: number;
+  total_cash_sales: number;
+  transaction_count: number;
+  expected_amount: number; // initial_amount + total_cash_sales
+  reported_amount: number;
+  difference: number; // reported - expected
+}
+
+export interface POSCartItem {
+  product_id: string;
+  product_name: string;
+  price: number;
+  quantity: number;
+  selectedVariant?: string;
+}
+
+export interface PaymentInfo {
+  method: 'cash' | 'card';
+  amount_received?: number; // solo para efectivo
+}
+
+export interface SellerDashboardStats {
+  today_sales: number;
+  today_orders_completed: number;
+  pending_orders: number;
+}
+
+export interface OrderFilters {
+  date_from?: string;
+  date_to?: string;
+  status?: string;
+}
+
+export interface DateRange {
+  from?: string;
+  to?: string;
+}
+
+export interface SellerStat {
+  seller_id: string;
+  seller_name: string;
+  total_sales: number;
+  total_amount: number;
+}
+
+export interface DeliveryStat {
+  delivery_person_id: string;
+  delivery_person_name: string;
+  completed_deliveries: number;
+  average_rating: number | null;
+}
+
+export interface SalesComparison {
+  in_store_sales: number;
+  in_store_amount: number;
+  online_sales: number;
+  online_amount: number;
+  total_sales: number;
+  total_amount: number;
+}
+

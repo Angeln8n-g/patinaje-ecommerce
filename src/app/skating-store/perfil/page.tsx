@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock } from "lucide-react";
+import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock, Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Order } from "@/types/skating-store";
@@ -25,7 +25,7 @@ const STATUS_MAP = {
 };
 
 export default function ProfilePage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isSeller, isAdmin, isDelivery } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -143,6 +143,30 @@ export default function ProfilePage() {
         <p className="text-muted-foreground text-lg">
           Gestiona tus pedidos e información personal.
         </p>
+        {isSeller && (
+          <Link href="/seller">
+            <Button className="mt-4 font-bold" variant="default">
+              <Store className="mr-2 h-4 w-4" />
+              Ir al Panel de Vendedor
+            </Button>
+          </Link>
+        )}
+        {isAdmin && (
+          <Link href="/admin">
+            <Button className="mt-4 font-bold" variant="default">
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Ir al Panel de Admin
+            </Button>
+          </Link>
+        )}
+        {isDelivery && (
+          <Link href="/delivery">
+            <Button className="mt-4 font-bold" variant="default">
+              <Truck className="mr-2 h-4 w-4" />
+              Ir al Panel de Repartidor
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

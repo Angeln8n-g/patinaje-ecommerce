@@ -15,7 +15,15 @@ import { toast } from "sonner";
 import { Product, Category } from "@/types/skating-store";
 import { createProduct, updateProduct } from "@/lib/skating-store/product-actions";
 import { getCategories } from "@/lib/skating-store/content-actions";
-import { Plus, X, Image as ImageIcon } from "lucide-react";
+import { Plus, X, Image as ImageIcon, RefreshCw, Printer } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+
+function generateBarcode(): string {
+  const prefix = "SK";
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return prefix + "-" + timestamp + "-" + random;
+}
 
 const formSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -25,6 +33,7 @@ const formSchema = z.object({
   category: z.string().min(1, "Selecciona una categoría"),
   images: z.array(z.string().url("Debe ser una URL válida")).min(1, "Añade al menos una imagen"),
   featured: z.boolean(),
+  barcode: z.string().optional(),
   variant_type: z.enum(["none", "size", "measurement"]),
   variant_options: z.array(z.string()),
 });
@@ -56,6 +65,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       category: initialData?.category || "",
       images: initialData?.images && initialData.images.length > 0 ? initialData.images : [],
       featured: initialData?.featured || false,
+      barcode: initialData?.barcode || generateBarcode(),
       variant_type: initialData?.variant_type || "none",
       variant_options: initialData?.variant_options || [],
     },
@@ -96,7 +106,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const addImage = () => {
     if (!imageUrlInput) return;
     try {
-      new URL(imageUrlInput); // Validate URL
+      new URL(imageUrlInput);
       const currentImages = form.getValues("images");
       form.setValue("images", [...currentImages, imageUrlInput]);
       setImageUrlInput("");
@@ -129,6 +139,41 @@ export function ProductForm({ initialData }: ProductFormProps) {
   };
 
   const currentVariantType = form.watch("variant_type");
+  const currentBarcode = form.watch("barcode");
+
+  const printQR = () => {
+    const name = form.getValues("name") || "Producto";
+    const price = form.getValues("price") || 0;
+    const barcode = form.getValues("barcode") || "";
+    const svgEl = document.getElementById("qr-preview-svg")?.querySelector("svg");
+    if (!svgEl) {
+      toast.error("No se pudo generar el QR");
+      return;
+    }
+    const svgMarkup = svgEl.outerHTML;
+    const printWindow = window.open("", "_blank", "width=400,height=500");
+    if (!printWindow) return;
+    printWindow.document.write(
+      "<!DOCTYPE html><html><head><title>QR - " + name + "</title>" +
+      "<style>" +
+      "body{margin:0;padding:20px;font-family:Arial,sans-serif;text-align:center}" +
+      ".label{display:inline-block;border:1px dashed #ccc;padding:16px;margin:8px;width:200px}" +
+      ".label svg{width:150px;height:150px}" +
+      ".label h3{margin:8px 0 4px;font-size:14px}" +
+      ".label p{margin:2px 0;font-size:11px;color:#555}" +
+      ".label .price{font-size:16px;font-weight:bold;margin-top:6px}" +
+      "@media print{.label{border:1px dashed #999}}" +
+      "</style></head><body>" +
+      '<div class="label">' + svgMarkup +
+      "<h3>" + name + "</h3>" +
+      "<p>" + barcode + "</p>" +
+      '<p class="price">$' + price.toFixed(2) + "</p>" +
+      "</div>" +
+      "<script>setTimeout(function(){window.print()},200)<\/script>" +
+      "</body></html>"
+    );
+    printWindow.document.close();
+  };
 
   return (
     <Form {...form}>
@@ -246,6 +291,56 @@ export function ProductForm({ initialData }: ProductFormProps) {
             )}
           />
         </div>
+
+        {/* Código de barras */}
+        <FormField
+          control={form.control}
+          name="barcode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Código de Barras / QR</FormLabel>
+              <div className="flex gap-2">
+                <FormControl>
+                  <Input placeholder="SK-XXXXXX-XXXX" {...field} />
+                </FormControl>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => form.setValue("barcode", generateBarcode())}
+                  title="Generar nuevo código"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={printQR}
+                  title="Imprimir QR"
+                  disabled={!currentBarcode}
+                >
+                  <Printer className="h-4 w-4" />
+                </Button>
+              </div>
+              {currentBarcode && (
+                <div id="qr-preview-svg" className="flex items-center gap-4 mt-3 p-3 rounded-lg border bg-white">
+                  <QRCodeSVG value={currentBarcode} size={96} level="M" />
+                  <div className="text-sm">
+                    <p className="font-mono font-medium">{currentBarcode}</p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Este QR se puede escanear desde el POS
+                    </p>
+                  </div>
+                </div>
+              )}
+              <FormDescription>
+                Se genera automáticamente. Puedes editarlo, regenerarlo o imprimirlo.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Imágenes */}
         <div className="space-y-4">

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { getProducts } from "@/lib/skating-store/supabase-queries";
 import { Badge } from "@/components/ui/badge";
+import { ProductQRPrint } from "@/components/admin/ProductQRPrint";
 
 export const dynamic = 'force-dynamic';
 
@@ -21,12 +22,15 @@ export default async function AdminProductsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Productos</h1>
-        <Link href="/admin/products/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Producto
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ProductQRPrint products={products} />
+          <Link href="/admin/products/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Producto
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-md border bg-card">
@@ -37,6 +41,7 @@ export default async function AdminProductsPage() {
               <TableHead>Categoría</TableHead>
               <TableHead>Precio</TableHead>
               <TableHead>Stock</TableHead>
+              <TableHead>Código</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -48,6 +53,11 @@ export default async function AdminProductsPage() {
                 <TableCell className="capitalize">{product.category}</TableCell>
                 <TableCell>${product.price.toFixed(2)}</TableCell>
                 <TableCell>{product.stock}</TableCell>
+                <TableCell>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {product.barcode || "—"}
+                  </span>
+                </TableCell>
                 <TableCell>
                   {product.featured ? (
                     <Badge variant="secondary">Destacado</Badge>

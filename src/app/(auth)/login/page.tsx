@@ -61,8 +61,29 @@ export default function LoginPage() {
         throw error;
       }
 
-      toast.success("¡Bienvenido de nuevo!");
-      router.push("/skating-store");
+      // Check user role to redirect accordingly
+      const { data: { user: loggedUser } } = await supabase.auth.getUser();
+      if (loggedUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", loggedUser.id)
+          .single();
+
+        toast.success("¡Bienvenido de nuevo!");
+
+        if (profile?.role === "ADMIN") {
+          router.push("/admin");
+        } else if (profile?.role === "SELLER") {
+          router.push("/seller");
+        } else if (profile?.role === "DELIVERY") {
+          router.push("/delivery");
+        } else {
+          router.push("/skating-store");
+        }
+      } else {
+        router.push("/skating-store");
+      }
     } catch (error: any) {
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 500);
