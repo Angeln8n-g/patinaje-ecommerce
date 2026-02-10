@@ -1,6 +1,8 @@
 import { ProductForm } from "@/components/admin/ProductForm";
 import { getProductByIdServer } from "@/lib/skating-store/product-actions";
-import { notFound } from "next/navigation";
+import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 
 interface EditProductPageProps {
   params: Promise<{
@@ -13,7 +15,17 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
   const product = await getProductByIdServer(id);
 
   if (!product) {
-    notFound();
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <h1 className="text-2xl font-bold mb-4">Producto no encontrado</h1>
+        <p className="text-muted-foreground mb-6">
+          No se pudo cargar el producto. Verifica que exista o intenta de nuevo.
+        </p>
+        <Link href="/admin/products" className="text-primary underline">
+          Volver a productos
+        </Link>
+      </div>
+    );
   }
 
   return (

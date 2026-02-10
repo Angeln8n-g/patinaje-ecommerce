@@ -94,7 +94,7 @@ export async function getProductByIdServer(id: string): Promise<Product | null> 
     .single();
 
   if (error) {
-    console.error("Error fetching product:", error);
+    console.error("Error fetching product:", error.message, error.code);
     return null;
   }
 
