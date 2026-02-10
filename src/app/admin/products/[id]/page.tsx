@@ -1,5 +1,5 @@
 import { ProductForm } from "@/components/admin/ProductForm";
-import { getProductById } from "@/lib/skating-store/supabase-queries";
+import { getProductByIdServer } from "@/lib/skating-store/product-actions";
 import { notFound } from "next/navigation";
 
 interface EditProductPageProps {
@@ -10,7 +10,7 @@ interface EditProductPageProps {
 
 export default async function EditProductPage({ params }: EditProductPageProps) {
   const { id } = await params;
-  const product = await getProductById(id);
+  const product = await getProductByIdServer(id);
 
   if (!product) {
     notFound();

@@ -9,14 +9,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getProducts } from "@/lib/skating-store/supabase-queries";
+import { getProductsServer } from "@/lib/skating-store/product-actions";
 import { Badge } from "@/components/ui/badge";
 import { ProductQRPrint } from "@/components/admin/ProductQRPrint";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminProductsPage() {
-  const products = await getProducts();
+  const products = await getProductsServer();
 
   return (
     <div className="space-y-8">

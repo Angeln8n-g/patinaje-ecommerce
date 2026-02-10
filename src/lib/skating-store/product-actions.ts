@@ -83,3 +83,36 @@ export async function deleteProduct(id: string) {
     throw new Error("Failed to delete product");
   }
 }
+
+export async function getProductByIdServer(id: string): Promise<Product | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("skating_products")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("Error fetching product:", error);
+    return null;
+  }
+
+  return data as Product;
+}
+
+export async function getProductsServer(): Promise<Product[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("skating_products")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching products:", error);
+    return [];
+  }
+
+  return (data || []) as Product[];
+}
