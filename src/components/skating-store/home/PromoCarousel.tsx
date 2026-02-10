@@ -104,7 +104,7 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
             )}
             {banner.link_url && (
               <Link href={banner.link_url}>
-                <Button size="lg" className="text-xl px-12 py-8 rounded-full bg-[#D7F000] text-black hover:bg-white transition-all duration-300 font-black uppercase tracking-widest border-none shadow-[0_0_20px_rgba(215,240,0,0.3)]">
+                <Button size="lg" className="text-xl px-12 py-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 font-black uppercase tracking-widest border-none glow-primary">
                   Ver Oferta
                 </Button>
               </Link>
@@ -120,7 +120,7 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-14 w-14 rounded-full bg-black/10 text-white hover:bg-[#D7F000] hover:text-black transition-all duration-300 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+              className="h-14 w-14 rounded-full bg-black/10 text-white hover:bg-primary hover:text-primary-foreground transition-all duration-300 backdrop-blur-sm opacity-0 group-hover:opacity-100"
               onClick={prevSlide}
             >
               <ChevronLeft className="h-8 w-8" />
@@ -130,7 +130,7 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-14 w-14 rounded-full bg-black/10 text-white hover:bg-[#D7F000] hover:text-black transition-all duration-300 backdrop-blur-sm opacity-0 group-hover:opacity-100"
+              className="h-14 w-14 rounded-full bg-black/10 text-white hover:bg-primary hover:text-primary-foreground transition-all duration-300 backdrop-blur-sm opacity-0 group-hover:opacity-100"
               onClick={nextSlide}
             >
               <ChevronRight className="h-8 w-8" />
@@ -143,7 +143,7 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
               <button
                 key={index}
                 className={`h-1.5 transition-all duration-500 rounded-full ${
-                  index === currentIndex ? "bg-[#D7F000] w-12" : "bg-white/30 w-6 hover:bg-white/60"
+                  index === currentIndex ? "bg-primary w-12" : "bg-white/30 w-6 hover:bg-white/60"
                 }`}
                 onClick={() => setCurrentIndex(index)}
               />

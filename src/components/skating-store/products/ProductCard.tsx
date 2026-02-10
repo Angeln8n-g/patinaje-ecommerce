@@ -75,18 +75,18 @@ export function ProductCard({ product }: ProductCardProps) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <Card className="h-full border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[32px] bg-card overflow-hidden relative group-hover:-translate-y-1">
+      <Card className="h-full border border-border shadow-sm hover:shadow-[0_8px_30px_rgba(212,160,80,0.15)] transition-all duration-300 rounded-[32px] bg-card overflow-hidden relative group-hover:-translate-y-1">
         {/* Favorite Icon - Restored for design match */}
         <button 
           onClick={handleToggleFavorite}
           className={`absolute top-4 right-4 z-10 h-10 w-10 flex items-center justify-center rounded-full transition-all duration-200 ${
-            isFav ? "bg-white text-destructive shadow-sm" : "bg-white/60 text-muted-foreground hover:bg-white hover:text-destructive"
+            isFav ? "bg-card text-destructive shadow-sm" : "bg-card/60 text-muted-foreground hover:bg-card hover:text-destructive"
           }`}
         >
           <Heart className={`h-5 w-5 ${isFav ? "fill-current" : ""}`} />
         </button>
 
-        <div className="relative aspect-square p-6 bg-[#F8F9FA] overflow-hidden">
+        <div className="relative aspect-square p-6 bg-secondary overflow-hidden">
           {/* Default Image */}
           <div className={`relative w-full h-full transition-opacity duration-300 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
              <Image
@@ -119,7 +119,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <h3 className="font-bold text-base line-clamp-2 mb-2 min-h-[3rem]">{product.name}</h3>
           
           <div className="flex items-baseline gap-2">
-            <span className="font-extrabold text-lg">{formatCurrency(product.price)}</span>
+            <span className="font-extrabold text-lg text-primary">{formatCurrency(product.price)}</span>
             <span className="text-sm text-muted-foreground line-through decoration-muted-foreground/50">
               {formatCurrency(previousPrice)}
             </span>

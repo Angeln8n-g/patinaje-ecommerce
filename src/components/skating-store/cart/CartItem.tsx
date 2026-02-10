@@ -19,11 +19,11 @@ export function CartItem({ item, editable = true }: CartItemProps) {
   return (
     <div className="flex gap-4 py-6 items-center">
       {/* Checkbox (Visual - Lime Green) */}
-      <div className="h-6 w-6 rounded-full bg-[#D7F000] flex items-center justify-center text-black shrink-0">
+      <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
         <Check className="h-4 w-4" />
       </div>
 
-      <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-[20px] bg-[#F8F9FA] p-3">
+      <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-[20px] bg-secondary p-3">
         <Image
           src={product.images[0] || "https://placehold.co/600x600/png?text=Skate"}
           alt={product.name}
@@ -50,7 +50,7 @@ export function CartItem({ item, editable = true }: CartItemProps) {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8 rounded-full hover:bg-white text-muted-foreground" 
+                className="h-8 w-8 rounded-full hover:bg-accent text-muted-foreground" 
                 onClick={() => updateQuantity(product.id, quantity - 1)}
               >
                 <Minus className="h-3 w-3" />
@@ -59,7 +59,7 @@ export function CartItem({ item, editable = true }: CartItemProps) {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8 rounded-full hover:bg-white text-muted-foreground" 
+                className="h-8 w-8 rounded-full hover:bg-accent text-muted-foreground" 
                 onClick={() => updateQuantity(product.id, quantity + 1)}
               >
                 <Plus className="h-3 w-3" />

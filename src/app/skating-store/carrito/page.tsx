@@ -47,7 +47,7 @@ export default function CartPage() {
           {/* Select All Header */}
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-4">
-              <div className="h-6 w-6 rounded-full bg-[#D7F000] flex items-center justify-center text-black">
+              <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                 <Check className="h-4 w-4" />
               </div>
               <span className="font-bold">Select all</span>
@@ -69,7 +69,7 @@ export default function CartPage() {
         <div className="lg:col-span-1">
           <div className="bg-card sticky top-24 space-y-6">
             <Link href="/skating-store/checkout" className="w-full block">
-              <Button className="w-full h-14 text-lg font-bold rounded-2xl bg-[#D7F000] text-black hover:bg-[#CBE600] shadow-sm transition-transform active:scale-95" size="lg">
+              <Button className="w-full h-14 text-lg font-bold rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-transform active:scale-95 glow-primary" size="lg">
                 Checkout
               </Button>
             </Link>

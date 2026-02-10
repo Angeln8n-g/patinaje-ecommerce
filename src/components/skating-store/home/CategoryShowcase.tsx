@@ -74,7 +74,7 @@ export function CategoryShowcase({ categories = [] }: CategoryShowcaseProps) {
                 href={`/skating-store/catalogo?category=${category.slug}`} 
                 className="group flex flex-col items-center gap-3 min-w-[80px] snap-center shrink-0"
               >
-                <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-secondary flex items-center justify-center transition-all group-hover:bg-primary group-hover:shadow-lg group-hover:scale-105">
+                <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-secondary border border-border flex items-center justify-center transition-all group-hover:bg-primary group-hover:shadow-lg group-hover:scale-105">
                   {/* Icon or Letter */}
                   <div className="text-muted-foreground group-hover:text-primary-foreground">
                      {getCategoryIcon(category.slug, category.icon_name, category.icon_url) || (

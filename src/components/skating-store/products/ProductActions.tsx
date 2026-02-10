@@ -68,7 +68,7 @@ export function ProductActions({ product }: { product: Product }) {
 
       <Button 
         size="lg" 
-        className="w-full bg-[#D7F000] text-black hover:bg-[#CBE600] font-bold text-lg h-14 rounded-2xl shadow-sm transition-transform active:scale-95" 
+        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-lg h-14 rounded-2xl shadow-sm transition-transform active:scale-95 glow-primary" 
         onClick={handleAddToCart}
       >
         Add to cart

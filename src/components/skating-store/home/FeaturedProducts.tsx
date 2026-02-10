@@ -59,9 +59,9 @@ export function FeaturedProducts({ products }: FeaturedProductsProps) {
     <section className="mb-12 container mx-auto px-4">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <h2 className="text-3xl font-bold tracking-tight">Flash Sale</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Flash Sale</h2>
           {flashSaleEnd && timeLeft && timeLeft !== "00:00:00" && (
-            <div className="bg-[#D7F000] text-black px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
+            <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
               <span className="font-mono tracking-widest">{timeLeft}</span>
             </div>
           )}

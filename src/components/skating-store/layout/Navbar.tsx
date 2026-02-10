@@ -72,16 +72,16 @@ export function Navbar() {
   if (!isClient) {
       // Return a skeleton or minimal structure during SSR to match initial hydration
       return (
-        <div className="border-b bg-background sticky top-0 z-50 h-[120px]">
+        <div className="border-b border-border bg-background/95 backdrop-blur-md sticky top-0 z-50 h-[120px]">
           {/* Optional: Add skeleton loading state here if needed */}
         </div>
       );
   }
 
   return (
-    <div className="border-b bg-background sticky top-0 z-50">
+    <div className="border-b border-border bg-background/95 backdrop-blur-md sticky top-0 z-50">
       {/* Top Bar for Address - Desktop only */}
-      <div className={`bg-secondary/30 text-xs py-3 px-4 border-b hidden md:block transition-all duration-300 ${!user ? 'h-0 py-0 border-none overflow-hidden' : ''}`}>
+      <div className={`bg-secondary/50 text-xs py-3 px-4 border-b hidden md:block transition-all duration-300 ${!user ? 'h-0 py-0 border-none overflow-hidden' : ''}`}>
         <div className="container mx-auto flex justify-between items-center">
           <Link href="/skating-store/perfil" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
@@ -184,7 +184,7 @@ export function Navbar() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             placeholder="Search the entire shop" 
-            className="pl-12 rounded-2xl bg-secondary border-none h-12 focus-visible:ring-primary shadow-sm"
+            className="pl-12 rounded-2xl bg-secondary/50 border border-border h-12 focus-visible:ring-primary shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleSearch}

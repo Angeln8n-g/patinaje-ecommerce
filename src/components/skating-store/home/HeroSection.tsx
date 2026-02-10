@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 export function HeroSection() {
   return (
-    <section className="relative h-[500px] flex items-center justify-center bg-muted text-center rounded-lg overflow-hidden mb-12">
+    <section className="relative h-[500px] flex items-center justify-center bg-gradient-to-b from-background via-background to-accent text-center rounded-lg overflow-hidden mb-12 vignette">
       <div 
         className="absolute inset-0 bg-cover bg-center z-0 opacity-50"
         style={{ backgroundImage: "url('https://placehold.co/1200x500/png?text=Skate+Park')" }}
@@ -17,10 +17,10 @@ export function HeroSection() {
         </p>
         <div className="flex justify-center gap-4">
           <Link href="/skating-store/catalogo">
-            <Button size="lg" className="text-lg px-8">Ver Catálogo</Button>
+            <Button size="lg" className="text-lg px-8 bg-primary text-primary-foreground glow-primary">Ver Catálogo</Button>
           </Link>
           <Link href="/skating-store/sobre-nosotros">
-            <Button variant="outline" size="lg" className="text-lg px-8 bg-background/80 backdrop-blur-sm">Conócenos</Button>
+            <Button variant="outline" size="lg" className="text-lg px-8 bg-background/80 backdrop-blur-sm border border-border text-foreground">Conócenos</Button>
           </Link>
         </div>
       </div>
