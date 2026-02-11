@@ -86,14 +86,14 @@ export function ProductCard({ product }: ProductCardProps) {
           <Heart className={`h-5 w-5 ${isFav ? "fill-current" : ""}`} />
         </button>
 
-        <div className="relative aspect-square p-6 bg-secondary overflow-hidden">
+        <div className="relative aspect-square p-6 bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
           {/* Default Image */}
           <div className={`relative w-full h-full transition-opacity duration-300 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
              <Image
               src={coverImage}
               alt={product.name}
               fill
-              className="object-contain mix-blend-multiply transition-transform group-hover:scale-105"
+              className="object-contain transition-transform group-hover:scale-105 group-hover:brightness-110"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
