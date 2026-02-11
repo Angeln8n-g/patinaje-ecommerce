@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { getStaticContent } from "@/lib/skating-store/content-actions";
+import { getStaticContent } from "@/lib/skating-store/content-queries";
 
 export const dynamic = 'force-dynamic';
 

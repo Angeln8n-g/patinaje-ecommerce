@@ -1,4 +1,4 @@
-import { getProductByIdServer, getProductReviewsServer } from "@/lib/skating-store/product-actions";
+import { getProductByIdServer, getProductReviewsServer } from "@/lib/skating-store/product-queries";
 import { ProductGallery } from "@/components/skating-store/products/ProductGallery";
 import { ProductActions } from "@/components/skating-store/products/ProductActions";
 import { ProductReviews } from "@/components/skating-store/products/ProductReviews";

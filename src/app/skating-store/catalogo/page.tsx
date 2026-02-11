@@ -1,7 +1,7 @@
 import { ProductGrid } from "@/components/skating-store/products/ProductGrid";
 import { CategoryFilter } from "@/components/skating-store/products/CategoryFilter";
-import { getProductsFilteredServer } from "@/lib/skating-store/product-actions";
-import { getCategories } from "@/lib/skating-store/content-actions";
+import { getProductsFilteredServer } from "@/lib/skating-store/product-queries";
+import { getCategories } from "@/lib/skating-store/content-queries";
 import { ProductCategory } from "@/types/skating-store";
 
 export const dynamic = 'force-dynamic';

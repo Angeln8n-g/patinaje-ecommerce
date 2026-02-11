@@ -3,8 +3,8 @@ import { CategoryShowcase } from "@/components/skating-store/home/CategoryShowca
 import { PromoCarousel } from "@/components/skating-store/home/PromoCarousel";
 import { DeliveryPromoBanner } from "@/components/skating-store/home/DeliveryPromoBanner";
 import { InfiniteCatalog } from "@/components/skating-store/home/InfiniteCatalog";
-import { getProductsServer } from "@/lib/skating-store/product-actions";
-import { getBanners, getCategories, getActivePromoTextBanner } from "@/lib/skating-store/content-actions";
+import { getProductsServer } from "@/lib/skating-store/product-queries";
+import { getBanners, getCategories, getActivePromoTextBanner } from "@/lib/skating-store/content-queries";
 import Image from "next/image";
 
 export const dynamic = 'force-dynamic';

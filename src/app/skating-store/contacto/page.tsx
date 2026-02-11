@@ -1,6 +1,6 @@
 import { ContactForm } from "@/components/skating-store/contact/ContactForm";
 import { Mail, MapPin, Phone } from "lucide-react";
-import { getStaticContent } from "@/lib/skating-store/content-actions";
+import { getStaticContent } from "@/lib/skating-store/content-queries";
 
 export const dynamic = 'force-dynamic';
 

@@ -1,5 +1,5 @@
 import { ProductForm } from "@/components/admin/ProductForm";
-import { getProductByIdServer } from "@/lib/skating-store/product-actions";
+import { getProductByIdServer } from "@/lib/skating-store/product-queries";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";

@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getProductsServer } from "@/lib/skating-store/product-actions";
+import { getProductsServer } from "@/lib/skating-store/product-queries";
 import { Badge } from "@/components/ui/badge";
 import { ProductQRPrint } from "@/components/admin/ProductQRPrint";
 
