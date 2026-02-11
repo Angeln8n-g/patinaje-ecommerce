@@ -21,13 +21,15 @@ export async function getProductByIdServer(id: string): Promise<Product | null> 
 export async function getProductsServer(): Promise<Product[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data, error, count, status, statusText } = await supabase
     .from("skating_products")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
 
+  console.log("[getProductsServer] status:", status, statusText, "count:", count, "rows:", data?.length, "error:", error);
+
   if (error) {
-    console.error("Error fetching products:", error);
+    console.error("[getProductsServer] ERROR:", JSON.stringify(error));
     return [];
   }
 
