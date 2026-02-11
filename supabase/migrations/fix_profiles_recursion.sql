@@ -154,3 +154,73 @@ DROP POLICY IF EXISTS "Admins can manage categories" ON categories;
 CREATE POLICY "Admins can manage categories"
   ON categories FOR ALL
   USING (public.get_my_role() = 'ADMIN');
+
+-- Ensure public read for categories
+DROP POLICY IF EXISTS "Categories are viewable by everyone" ON categories;
+CREATE POLICY "Categories are viewable by everyone"
+  ON categories FOR SELECT
+  USING (true);
+
+-- Ensure public read for products
+DROP POLICY IF EXISTS "Products are viewable by everyone" ON skating_products;
+CREATE POLICY "Products are viewable by everyone"
+  ON skating_products FOR SELECT
+  USING (true);
+
+-- ==========================================
+-- banners
+-- ==========================================
+DROP POLICY IF EXISTS "Admins can view all banners" ON banners;
+CREATE POLICY "Admins can view all banners"
+  ON banners FOR SELECT
+  USING (public.get_my_role() = 'ADMIN');
+
+DROP POLICY IF EXISTS "Admins can manage banners" ON banners;
+CREATE POLICY "Admins can manage banners"
+  ON banners FOR ALL
+  USING (public.get_my_role() = 'ADMIN');
+
+-- Keep public read for active banners
+DROP POLICY IF EXISTS "Active banners are viewable by everyone" ON banners;
+CREATE POLICY "Active banners are viewable by everyone"
+  ON banners FOR SELECT
+  USING (active = true);
+
+DROP POLICY IF EXISTS "Banners are viewable by everyone" ON banners;
+CREATE POLICY "Banners are viewable by everyone"
+  ON banners FOR SELECT
+  USING (true);
+
+-- ==========================================
+-- promo_text_banners
+-- ==========================================
+DROP POLICY IF EXISTS "Admin full access" ON promo_text_banners;
+CREATE POLICY "Admin full access"
+  ON promo_text_banners FOR ALL
+  USING (public.get_my_role() = 'ADMIN');
+
+DROP POLICY IF EXISTS "Public read access" ON promo_text_banners;
+CREATE POLICY "Public read access"
+  ON promo_text_banners FOR SELECT
+  USING (true);
+
+-- ==========================================
+-- static_content
+-- ==========================================
+DROP POLICY IF EXISTS "Admin full access" ON static_content;
+CREATE POLICY "Admin full access"
+  ON static_content FOR ALL
+  USING (public.get_my_role() = 'ADMIN');
+
+DROP POLICY IF EXISTS "Public read access" ON static_content;
+CREATE POLICY "Public read access"
+  ON static_content FOR SELECT
+  USING (true);
+
+-- ==========================================
+-- delivery_ratings
+-- ==========================================
+DROP POLICY IF EXISTS "Admins can view all ratings" ON delivery_ratings;
+CREATE POLICY "Admins can view all ratings"
+  ON delivery_ratings FOR SELECT
+  USING (public.get_my_role() = 'ADMIN');
