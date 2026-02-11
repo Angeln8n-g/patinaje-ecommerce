@@ -1,6 +1,6 @@
 import { ProductGrid } from "@/components/skating-store/products/ProductGrid";
 import { CategoryFilter } from "@/components/skating-store/products/CategoryFilter";
-import { getProducts } from "@/lib/skating-store/supabase-queries";
+import { getProductsFilteredServer } from "@/lib/skating-store/product-actions";
 import { getCategories } from "@/lib/skating-store/content-actions";
 import { ProductCategory } from "@/types/skating-store";
 
@@ -16,7 +16,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const search = (resolvedSearchParams?.search as string) || null;
   
   const [products, categories] = await Promise.all([
-    getProducts(category, search),
+    getProductsFilteredServer(category, search),
     getCategories()
   ]);
 

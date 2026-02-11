@@ -3,7 +3,7 @@ import { CategoryShowcase } from "@/components/skating-store/home/CategoryShowca
 import { PromoCarousel } from "@/components/skating-store/home/PromoCarousel";
 import { DeliveryPromoBanner } from "@/components/skating-store/home/DeliveryPromoBanner";
 import { InfiniteCatalog } from "@/components/skating-store/home/InfiniteCatalog";
-import { getProducts } from "@/lib/skating-store/supabase-queries";
+import { getProductsServer } from "@/lib/skating-store/product-actions";
 import { getBanners, getCategories, getActivePromoTextBanner } from "@/lib/skating-store/content-actions";
 import Image from "next/image";
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const [products, banners, categories, activePromo] = await Promise.all([
-    getProducts(),
+    getProductsServer(),
     getBanners(true), // Fetch only active banners
     getCategories(),
     getActivePromoTextBanner()

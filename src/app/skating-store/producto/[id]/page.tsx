@@ -1,4 +1,4 @@
-import { getProductById, getProductReviews } from "@/lib/skating-store/supabase-queries";
+import { getProductByIdServer, getProductReviewsServer, getProductsServer } from "@/lib/skating-store/product-actions";
 import { ProductGallery } from "@/components/skating-store/products/ProductGallery";
 import { ProductActions } from "@/components/skating-store/products/ProductActions";
 import { ProductReviews } from "@/components/skating-store/products/ProductReviews";
@@ -7,17 +7,14 @@ import { Separator } from "@/components/ui/separator";
 import { Star, ShieldCheck, MessageCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export const dynamicParams = true; // Permite generar páginas bajo demanda si no están pre-generadas
+export const dynamicParams = true;
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
 }
 
 export async function generateStaticParams() {
-  const { data: products } = await (await import('@/lib/supabase/client')).createClient()
-    .from('skating_products')
-    .select('id');
-
+  const products = await getProductsServer();
   return (products || []).map((product) => ({
     id: product.id,
   }));
@@ -27,8 +24,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const resolvedParams = await params;
   const { id } = resolvedParams;
   const [product, reviews] = await Promise.all([
-    getProductById(id),
-    getProductReviews(id)
+    getProductByIdServer(id),
+    getProductReviewsServer(id)
   ]);
 
   if (!product) {
