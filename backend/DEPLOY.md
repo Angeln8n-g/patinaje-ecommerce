@@ -131,10 +131,10 @@ import 'dotenv/config';
 import { pool } from './src/db/pool.js';
 import { hashPassword } from './src/lib/auth.js';
 async function main() {
-  const hash = await hashPassword('TU_PASSWORD_ADMIN');
+  const hash = await hashPassword('#Haxuel01');
   await pool.query(
     \"INSERT INTO profiles (email, password_hash, role, email_confirmed) VALUES (\$1, \$2, 'ADMIN', TRUE)\",
-    ['admin@hunykho.com', hash]
+    ['angellafraga@gmail.com', hash]
   );
   console.log('Admin created');
   await pool.end();

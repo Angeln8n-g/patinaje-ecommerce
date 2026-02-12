@@ -1,0 +1,126 @@
+# Despliegue del Frontend Next.js en VPS (hunykho.com)
+
+> Prerequisito: Ya tienes Node.js, PM2 y Nginx instalados en tu VPS.
+
+## 1. Ir al proyecto clonado
+
+```bash
+cd /home/skating-store
+```
+
+(O donde hayas clonado el repo con `git clone`)
+
+## 2. Instalar dependencias del frontend
+
+```bash
+npm install
+```
+
+## 3. Crear .env.local
+
+```bash
+nano .env.local
+```
+
+Pega esto:
+```
+NEXT_PUBLIC_API_URL=https://api.hunykho.com
+NEXT_PUBLIC_RESEND_API_KEY=re_3RAU97eV_8bj95e2aNwANei9rnWVdUedJ
+```
+
+Guarda con `Ctrl+O`, `Enter`, `Ctrl+X`.
+
+## 4. Compilar el frontend
+
+```bash
+npm run build
+```
+
+Esto puede tardar unos minutos.
+
+## 5. Iniciar con PM2
+
+```bash
+pm2 start npm --name skating-frontend -- start -- -p 3000
+pm2 save
+```
+
+Verifica que esté corriendo:
+```bash
+pm2 status
+```
+
+## 6. Configurar Nginx para el frontend
+
+```bash
+sudo nano /etc/nginx/sites-available/hunykho.com
+```
+
+Pega esto:
+```nginx
+server {
+    listen 80;
+    server_name hunykho.com www.hunykho.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Activar el sitio:
+```bash
+sudo ln -s /etc/nginx/sites-available/hunykho.com /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## 7. SSL con Certbot
+
+Primero asegúrate de tener registros DNS tipo A apuntando a tu VPS para:
+- `hunykho.com`
+- `www.hunykho.com` (opcional)
+
+Luego:
+```bash
+sudo certbot --nginx -d hunykho.com -d www.hunykho.com
+```
+
+## 8. Actualizar CORS del backend
+
+Edita el .env del backend para aceptar peticiones desde tu dominio:
+```bash
+nano /home/skating-store/backend/.env
+```
+
+Cambia CORS_ORIGIN a:
+```
+CORS_ORIGIN=https://hunykho.com,https://www.hunykho.com
+```
+
+Reinicia el backend:
+```bash
+pm2 restart skating-api
+```
+
+## 9. Verificar
+
+Abre `https://hunykho.com` en tu navegador. Deberías ver la tienda.
+
+## Actualizaciones futuras
+
+```bash
+cd /home/skating-store
+git pull
+npm install
+npm run build
+pm2 restart skating-frontend
+```

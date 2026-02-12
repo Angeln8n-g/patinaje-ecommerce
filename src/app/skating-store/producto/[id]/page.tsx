@@ -8,19 +8,10 @@ import { Separator } from "@/components/ui/separator";
 import { Star, ShieldCheck, MessageCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export const dynamicParams = true;
+export const dynamic = "force-dynamic";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
-}
-
-export async function generateStaticParams() {
-  try {
-    const products = await getProductsServer();
-    return products.map((product) => ({ id: product.id }));
-  } catch {
-    return [];
-  }
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
