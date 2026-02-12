@@ -27,7 +27,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   const averageRating = reviews.length > 0 
-    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    ? (reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length).toFixed(1)
     : "0.0";
 
   return (
