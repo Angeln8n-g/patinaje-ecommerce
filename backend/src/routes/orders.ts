@@ -109,7 +109,7 @@ router.post("/pos", requireAuth, requireRole("SELLER"), async (req, res) => {
 router.post("/:id/exchange", requireAuth, requireRole("SELLER"), async (req, res) => {
   try {
     const sellerId = (req as any).user.userId;
-    const orderId = req.params.id;
+    const orderId = req.params.id as string;
     const { original_product_id, original_quantity, new_product_id, new_quantity, justification } = req.body;
 
     if (!justification || justification.trim().length < 5) {
