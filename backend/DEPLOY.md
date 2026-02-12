@@ -35,16 +35,24 @@ sudo apt install nodejs -y
 sudo npm install -g pm2
 ```
 
-## 5. Subir el backend
+## 5. Clonar el proyecto desde GitHub
 
 ```bash
-# Desde tu máquina local:
-scp -r backend/ user@hunykho.com:/home/user/skating-api/
-
 # En el servidor:
-cd /home/user/skating-api
+cd /home
+git clone https://github.com/Angeln8n-g/RDPatina.git skating-store
+cd skating-store/backend
 npm install
 ```
+
+> Para futuras actualizaciones solo necesitas:
+> ```bash
+> cd /home/skating-store/backend
+> git pull
+> npm install
+> npm run build
+> pm2 restart skating-api
+> ```
 
 ## 6. Configurar .env
 
@@ -56,9 +64,9 @@ nano .env
 Edita con tus valores reales:
 ```
 DATABASE_URL=postgresql://skating_user:TU_PASSWORD_SEGURO@localhost:5432/skating_store
-JWT_SECRET=genera-algo-con-openssl-rand-hex-64
+JWT_SECRET=07a9ca8c0f41aa67912f79127bf67e82ca45512db2b7f2a8fbf3633bda02ab96873a3f73ed48a116654774dc2886c8ba44a254f4111d36409451857481e87d8b
 PORT=4000
-CORS_ORIGIN=https://patinaje-ecommerce.vercel.app
+CORS_ORIGIN=https://skating.hunykho.com,https://trae-patinaje-ecommerce-apa9.vercel.app
 ```
 
 ## 7. Inicializar la base de datos

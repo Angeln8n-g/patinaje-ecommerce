@@ -1,168 +1,76 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { Category, Banner, PromoTextBanner } from "@/types/skating-store";
 
-// --- Categories ---
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.hunykho.com";
 
-export async function getCategories() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name");
+async function getServerToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get("skating_token")?.value || null;
+}
 
-  if (error) {
-    console.error("Error fetching categories:", error);
-    return [];
+async function authServerFetch(endpoint: string, options: { method?: string; body?: any } = {}) {
+  const token = await getServerToken();
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `API Error: ${res.status}`);
   }
-  return data as Category[];
+  return res.json();
+}
+
+// Categories
+export async function getCategories(): Promise<Category[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/content/categories`, { cache: "no-store" });
+    return res.ok ? res.json() : [];
+  } catch { return []; }
 }
 
 export async function createCategory(category: Omit<Category, "id" | "created_at">) {
-  const supabase = await createClient();
-  
-  // Verify admin
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  
-  // Double check admin role via DB just in case, though RLS handles it
-  
-  const payload: any = {
-    name: (category as any).name,
-    slug: (category as any).slug,
-    description: (category as any).description ?? null,
-  };
-  if (typeof (category as any).icon_name !== "undefined") {
-    payload.icon_name = (category as any).icon_name || null;
-  }
-  if (typeof (category as any).icon_url !== "undefined") {
-    payload.icon_url = (category as any).icon_url || null;
-  }
-
-  let { data, error } = await supabase
-    .from("categories")
-    .insert([payload])
-    .select()
-    .single();
-
-  if (error) {
-    const msg = String((error as any)?.message || "");
-    const code = String((error as any)?.code || "");
-    if (code === "PGRST204" || msg.includes("icon_name") || msg.includes("icon_url")) {
-      delete payload.icon_name;
-      delete payload.icon_url;
-      const retry = await supabase
-        .from("categories")
-        .insert([payload])
-        .select()
-        .single();
-      data = retry.data as any;
-      error = retry.error as any;
-      if (!error) {
-        return { success: true, data };
-      }
-    }
-    console.error("Error creating category:", error);
-    throw new Error("Failed to create category");
-  }
-
-  return { success: true, data };
+  return authServerFetch("/api/content/categories", { method: "POST", body: category });
 }
 
 export async function deleteCategory(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("categories")
-    .delete()
-    .eq("id", id);
-
-  if (error) throw new Error("Failed to delete category");
-  return { success: true };
+  return authServerFetch(`/api/content/categories/${id}`, { method: "DELETE" });
 }
 
-// --- Banners ---
-
-export async function getBanners(activeOnly = false) {
-  const supabase = await createClient();
-  let query = supabase
-    .from("banners")
-    .select("*")
-    .order("display_order", { ascending: true });
-
-  if (activeOnly) {
-    query = query.eq("active", true);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Error fetching banners:", error);
-    return [];
-  }
-  return data as Banner[];
+// Banners
+export async function getBanners(activeOnly = false): Promise<Banner[]> {
+  try {
+    const qs = activeOnly ? "?active=true" : "";
+    const res = await fetch(`${API_URL}/api/content/banners${qs}`, { cache: "no-store" });
+    return res.ok ? res.json() : [];
+  } catch { return []; }
 }
 
 export async function createBanner(banner: Omit<Banner, "id" | "created_at">) {
-  const supabase = await createClient();
-  
-  const { data, error } = await supabase
-    .from("banners")
-    .insert([banner])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating banner:", error);
-    throw new Error("Failed to create banner");
-  }
-
-  return { success: true, data };
+  return authServerFetch("/api/content/banners", { method: "POST", body: banner });
 }
 
 export async function updateBanner(id: string, updates: Partial<Banner>) {
-  const supabase = await createClient();
-  
-  const { error } = await supabase
-    .from("banners")
-    .update(updates)
-    .eq("id", id);
-
-  if (error) throw new Error("Failed to update banner");
-  return { success: true };
+  return authServerFetch(`/api/content/banners/${id}`, { method: "PUT", body: updates });
 }
 
 export async function deleteBanner(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("banners")
-    .delete()
-    .eq("id", id);
-
-  if (error) throw new Error("Failed to delete banner");
-  return { success: true };
+  return authServerFetch(`/api/content/banners/${id}`, { method: "DELETE" });
 }
 
-// --- Promo Text Banners (Delivery/Tags) ---
-
-export async function getPromoTextBanners(activeOnly = false) {
-  const supabase = await createClient();
-  let query = supabase
-    .from("promo_text_banners")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (activeOnly) {
-    query = query.eq("active", true);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Error fetching promo banners:", error);
-    return [];
-  }
-  return data as PromoTextBanner[];
+// Promo Text Banners
+export async function getPromoTextBanners(activeOnly = false): Promise<PromoTextBanner[]> {
+  try {
+    const qs = activeOnly ? "?active=true" : "";
+    const res = await fetch(`${API_URL}/api/content/promo-banners${qs}`, { cache: "no-store" });
+    return res.ok ? res.json() : [];
+  } catch { return []; }
 }
 
 export async function getActivePromoTextBanner() {
@@ -171,39 +79,17 @@ export async function getActivePromoTextBanner() {
 }
 
 export async function updatePromoTextBanner(id: string, updates: Partial<PromoTextBanner>) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("promo_text_banners")
-    .update(updates)
-    .eq("id", id);
-
-  if (error) throw new Error("Failed to update promo banner");
-  return { success: true };
+  return authServerFetch(`/api/content/promo-banners/${id}`, { method: "PUT", body: updates });
 }
 
-// --- Static Content (About / Contact) ---
-
+// Static Content
 export async function getStaticContent(slug: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("static_content")
-    .select("*")
-    .eq("slug", slug)
-    .single();
-
-  if (error) {
-    console.error(`Error fetching static content ${slug}:`, error);
-    return null;
-  }
-  return data;
+  try {
+    const res = await fetch(`${API_URL}/api/content/static/${slug}`, { cache: "no-store" });
+    return res.ok ? res.json() : null;
+  } catch { return null; }
 }
 
 export async function updateStaticContent(slug: string, data: any) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("static_content")
-    .upsert({ slug, data, updated_at: new Date().toISOString() }, { onConflict: "slug" });
-
-  if (error) throw new Error("Failed to update static content");
-  return { success: true };
+  return authServerFetch(`/api/content/static/${slug}`, { method: "PUT", body: { data } });
 }

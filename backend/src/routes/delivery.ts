@@ -12,15 +12,21 @@ router.get("/shipments", requireAuth, async (req, res) => {
     const user = (req as any).user;
     let result;
     if (user.role === "ADMIN") {
-      result = await query("SELECT * FROM shipments ORDER BY created_at DESC");
+      result = await query(
+        `SELECT s.*, row_to_json(o) as order FROM shipments s
+         LEFT JOIN skating_orders o ON o.id = s.order_id ORDER BY s.created_at DESC`
+      );
     } else if (user.role === "DELIVERY") {
-      result = await query("SELECT * FROM shipments WHERE delivery_man_id = $1 ORDER BY created_at DESC", [user.userId]);
+      result = await query(
+        `SELECT s.*, row_to_json(o) as order FROM shipments s
+         LEFT JOIN skating_orders o ON o.id = s.order_id
+         WHERE s.delivery_man_id = $1 ORDER BY s.created_at DESC`, [user.userId]
+      );
     } else {
       result = await query(
-        `SELECT s.* FROM shipments s
+        `SELECT s.*, row_to_json(o) as order FROM shipments s
          JOIN skating_orders o ON o.id = s.order_id
-         WHERE o.user_id = $1 ORDER BY s.created_at DESC`,
-        [user.userId]
+         WHERE o.user_id = $1 ORDER BY s.created_at DESC`, [user.userId]
       );
     }
     res.json(result.rows);
@@ -29,14 +35,70 @@ router.get("/shipments", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/delivery/shipments/active — delivery: active shipments only
+router.get("/shipments/active", requireAuth, requireRole("DELIVERY"), async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const result = await query(
+      `SELECT s.*, row_to_json(o) as order FROM shipments s
+       LEFT JOIN skating_orders o ON o.id = s.order_id
+       WHERE s.delivery_man_id = $1 AND s.status != 'ENTREGADO'
+       ORDER BY s.created_at DESC`, [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener envíos activos" });
+  }
+});
+
+// GET /api/delivery/shipments/history — delivery: completed shipments
+router.get("/shipments/history", requireAuth, requireRole("DELIVERY"), async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const result = await query(
+      `SELECT s.*, row_to_json(o) as order FROM shipments s
+       LEFT JOIN skating_orders o ON o.id = s.order_id
+       WHERE s.delivery_man_id = $1 AND s.status = 'ENTREGADO'
+       ORDER BY s.updated_at DESC`, [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener historial" });
+  }
+});
+
+// GET /api/delivery/shipments/by-order/:orderId — shipment for a specific order
+router.get("/shipments/by-order/:orderId", requireAuth, async (req, res) => {
+  try {
+    const result = await query("SELECT * FROM shipments WHERE order_id = $1 LIMIT 1", [req.params.orderId]);
+    res.json(result.rows[0] || null);
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener envío" });
+  }
+});
+
 router.post("/shipments", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const { order_id, delivery_man_id } = req.body;
-    const result = await query(
-      "INSERT INTO shipments (order_id, delivery_man_id) VALUES ($1, $2) RETURNING *",
-      [order_id, delivery_man_id]
-    );
-    res.status(201).json(result.rows[0]);
+    // Check if shipment exists for this order
+    const existing = await query("SELECT id FROM shipments WHERE order_id = $1", [order_id]);
+    if (existing.rows.length > 0) {
+      // Update existing
+      const result = await query(
+        "UPDATE shipments SET delivery_man_id = $2, status = 'ASIGNADO', updated_at = NOW() WHERE order_id = $1 RETURNING *",
+        [order_id, delivery_man_id]
+      );
+      // Sync order status
+      await query("UPDATE skating_orders SET status = 'confirmed' WHERE id = $1", [order_id]);
+      res.json(result.rows[0]);
+    } else {
+      const result = await query(
+        "INSERT INTO shipments (order_id, delivery_man_id, status) VALUES ($1, $2, 'ASIGNADO') RETURNING *",
+        [order_id, delivery_man_id]
+      );
+      await query("UPDATE skating_orders SET status = 'confirmed' WHERE id = $1", [order_id]);
+      res.status(201).json(result.rows[0]);
+    }
   } catch (err) {
     res.status(500).json({ error: "Error al crear envío" });
   }
@@ -51,9 +113,62 @@ router.put("/shipments/:id", requireAuth, requireRole("ADMIN", "DELIVERY"), asyn
        WHERE id=$1 RETURNING *`,
       [req.params.id, status, current_lat, current_lng]
     );
+    // Sync order status
+    if (status && result.rows.length > 0) {
+      const orderStatusMap: Record<string, string> = { ASIGNADO: "confirmed", EN_RUTA: "shipped", CERCA: "shipped", ENTREGADO: "delivered" };
+      const newOrderStatus = orderStatusMap[status];
+      if (newOrderStatus) {
+        await query("UPDATE skating_orders SET status = $2 WHERE id = $1", [result.rows[0].order_id, newOrderStatus]);
+      }
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: "Error al actualizar envío" });
+  }
+});
+
+// ==========================================
+// Delivery Men
+// ==========================================
+router.get("/men", requireAuth, requireRole("ADMIN"), async (_req, res) => {
+  try {
+    const result = await query(
+      `SELECT p.id, p.email, p.first_name, p.last_name, p.created_at,
+       COALESCE(AVG(dr.rating), 0) as avg_rating, COUNT(dr.id) as rating_count
+       FROM profiles p
+       LEFT JOIN delivery_ratings dr ON dr.delivery_man_id = p.id
+       WHERE p.role = 'DELIVERY'
+       GROUP BY p.id ORDER BY avg_rating DESC`
+    );
+    res.json(result.rows.map((r: any) => ({ ...r, avg_rating: parseFloat(r.avg_rating), rating_count: parseInt(r.rating_count) })));
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener repartidores" });
+  }
+});
+
+// GET /api/delivery/men/stats — admin: delivery men with full stats
+router.get("/men/stats", requireAuth, requireRole("ADMIN"), async (_req, res) => {
+  try {
+    const profiles = await query("SELECT id, email, first_name, last_name, created_at FROM profiles WHERE role = 'DELIVERY'");
+    const delivered = await query("SELECT delivery_man_id, COUNT(*) as cnt FROM shipments WHERE status = 'ENTREGADO' GROUP BY delivery_man_id");
+    const active = await query("SELECT delivery_man_id, COUNT(*) as cnt FROM shipments WHERE status != 'ENTREGADO' GROUP BY delivery_man_id");
+    const ratings = await query("SELECT delivery_man_id, AVG(rating) as avg, COUNT(*) as cnt FROM delivery_ratings GROUP BY delivery_man_id");
+
+    const deliveredMap = new Map(delivered.rows.map((r: any) => [r.delivery_man_id, parseInt(r.cnt)]));
+    const activeMap = new Map(active.rows.map((r: any) => [r.delivery_man_id, parseInt(r.cnt)]));
+    const ratingsMap = new Map(ratings.rows.map((r: any) => [r.delivery_man_id, { avg: parseFloat(r.avg), cnt: parseInt(r.cnt) }]));
+
+    const stats = profiles.rows.map((p: any) => ({
+      ...p,
+      activeShipments: activeMap.get(p.id) || 0,
+      deliveredCount: deliveredMap.get(p.id) || 0,
+      ratingCount: ratingsMap.get(p.id)?.cnt || 0,
+      avgRating: ratingsMap.get(p.id)?.avg || 0,
+    }));
+
+    res.json(stats.sort((a: any, b: any) => b.avgRating - a.avgRating));
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener estadísticas" });
   }
 });
 
@@ -126,12 +241,13 @@ router.put("/location", requireAuth, requireRole("DELIVERY"), async (req, res) =
   }
 });
 
-router.get("/locations", requireAuth, requireRole("ADMIN", "DELIVERY"), async (_req, res) => {
+router.get("/locations", requireAuth, requireRole("ADMIN"), async (_req, res) => {
   try {
     const result = await query(
       `SELECT dl.*, p.first_name, p.last_name, p.email
        FROM delivery_locations dl
-       JOIN profiles p ON p.id = dl.delivery_man_id`
+       JOIN profiles p ON p.id = dl.delivery_man_id
+       ORDER BY dl.updated_at DESC`
     );
     res.json(result.rows);
   } catch (err) {
@@ -145,14 +261,65 @@ router.get("/locations", requireAuth, requireRole("ADMIN", "DELIVERY"), async (_
 router.post("/ratings", requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    const { order_id, delivery_man_id, rating, comment } = req.body;
+    const { order_id, rating, comment } = req.body;
+    // Get delivery_man_id from shipment
+    const shipment = await query("SELECT delivery_man_id FROM shipments WHERE order_id = $1 LIMIT 1", [order_id]);
+    if (shipment.rows.length === 0 || !shipment.rows[0].delivery_man_id) {
+      res.status(400).json({ error: "Información de entrega no encontrada" }); return;
+    }
     const result = await query(
       "INSERT INTO delivery_ratings (order_id, delivery_man_id, user_id, rating, comment) VALUES ($1,$2,$3,$4,$5) RETURNING *",
-      [order_id, delivery_man_id, userId, rating, comment]
+      [order_id, shipment.rows[0].delivery_man_id, userId, rating, comment]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) {
+  } catch (err: any) {
+    if (err.code === "23505") { res.status(409).json({ error: "Ya calificaste este pedido" }); return; }
     res.status(500).json({ error: "Error al crear calificación" });
+  }
+});
+
+router.get("/ratings/:orderId", requireAuth, async (req, res) => {
+  try {
+    const result = await query("SELECT * FROM delivery_ratings WHERE order_id = $1 LIMIT 1", [req.params.orderId]);
+    res.json(result.rows[0] || null);
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener calificación" });
+  }
+});
+
+// GET /api/delivery/ratings/stats/:deliveryManId — rating stats for a delivery man
+router.get("/ratings/stats/:deliveryManId", async (req, res) => {
+  try {
+    const result = await query("SELECT * FROM delivery_ratings WHERE delivery_man_id = $1 ORDER BY created_at DESC", [req.params.deliveryManId]);
+    const ratings = result.rows;
+    if (ratings.length === 0) {
+      res.json({ averageRating: 0, totalRatings: 0, ratingDistribution: {}, recentComments: [] }); return;
+    }
+    const sum = ratings.reduce((acc: number, r: any) => acc + r.rating, 0);
+    const dist: Record<number, number> = {};
+    ratings.forEach((r: any) => { dist[r.rating] = (dist[r.rating] || 0) + 1; });
+    const comments = ratings.filter((r: any) => r.comment).slice(0, 5).map((r: any) => ({ id: r.id, rating: r.rating, comment: r.comment, created_at: r.created_at }));
+    res.json({ averageRating: sum / ratings.length, totalRatings: ratings.length, ratingDistribution: dist, recentComments: comments });
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener estadísticas" });
+  }
+});
+
+// ==========================================
+// Invoices
+// ==========================================
+router.post("/invoices", requireAuth, async (req, res) => {
+  try {
+    const { order_id, customer_email, total } = req.body;
+    const date = new Date();
+    const invoiceNumber = "FAC-" + date.getFullYear() + "-" + order_id.substring(0, 4).toUpperCase() + "-" + String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+    const result = await query(
+      "INSERT INTO skating_invoices (order_id, invoice_number, customer_email, total_amount, status) VALUES ($1,$2,$3,$4,'sent') RETURNING *",
+      [order_id, invoiceNumber, customer_email, total]
+    );
+    res.status(201).json({ success: true, invoiceNumber });
+  } catch (err) {
+    res.status(500).json({ error: "Error al crear factura" });
   }
 });
 

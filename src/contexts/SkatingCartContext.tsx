@@ -1,11 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CartItem, Product } from '@/types/skating-store';
-import { useAuth } from './AuthContext';
-import { getCart, addToCart, updateCartItemQuantity, removeFromCart, clearCart as clearCartAction } from '@/lib/skating-store/cart-actions';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { CartItem, Product } from "@/types/skating-store";
+import { useAuth } from "./AuthContext";
+import { authFetch } from "@/lib/api/client";
 import { toast } from "sonner";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 
 interface CartContextType {
   items: CartItem[];
@@ -22,82 +22,57 @@ const SkatingCartContext = createContext<CartContextType | undefined>(undefined)
 
 export function SkatingCartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const router = useRouter();
 
-  // Load cart from DB if user is logged in
   useEffect(() => {
-    const loadCart = async () => {
-      if (user) {
-        setIsLoading(true);
-        try {
-          const cartItems = await getCart(user.id);
-          setItems(cartItems);
-        } catch (error) {
-          console.error("Error loading cart from DB:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setItems([]);
-      }
-      setIsLoaded(true);
-    };
-
-    loadCart();
+    if (user) {
+      loadCart();
+    } else {
+      setItems([]);
+    }
   }, [user]);
 
-  // Save to local storage logic removed as we enforce login
-  useEffect(() => {
-    // Legacy cleanup or empty effect
-  }, []);
+  const loadCart = async () => {
+    setIsLoading(true);
+    try {
+      const data = await authFetch<CartItem[]>("/api/cart");
+      setItems(data);
+    } catch (err) {
+      console.error("Error loading cart:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const addItem = async (product: Product, quantity: number, variant?: string) => {
     if (!user) {
       toast.error("Debes iniciar sesión para comprar", {
         description: "Regístrate o inicia sesión para agregar productos al carrito.",
-        action: {
-          label: "Ir a Login",
-          onClick: () => router.push("/login"),
-        },
+        action: { label: "Ir a Login", onClick: () => router.push("/login") },
       });
       return;
     }
-
     setIsLoading(true);
     try {
-      // Optimistic update
-      setItems(currentItems => {
-        // If same product AND same variant (or both no variant)
-        const existingItem = currentItems.find(item => 
-          item.product.id === product.id && item.selectedVariant === variant
-        );
-        
-        if (existingItem) {
-          return currentItems.map(item => 
-            (item.product.id === product.id && item.selectedVariant === variant)
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
+      setItems((curr) => {
+        const existing = curr.find((i) => i.product.id === product.id && i.selectedVariant === variant);
+        if (existing) {
+          return curr.map((i) =>
+            i.product.id === product.id && i.selectedVariant === variant
+              ? { ...i, quantity: i.quantity + quantity }
+              : i
           );
         }
-        return [...currentItems, { product, quantity, selectedVariant: variant }];
+        return [...curr, { product, quantity, selectedVariant: variant }];
       });
-
-      // Pass variant to backend
-      // Note: We need to update addToCart server action to accept variant too.
-      // Assuming cart-actions.ts needs update as well.
-      const result = await addToCart(user.id, product.id, quantity, variant);
-      
-      if (!result.success) {
-        console.error("Detailed server error:", result.error);
-        throw new Error(typeof result.error === 'string' ? result.error : "Failed to add to cart");
-      }
+      await authFetch("/api/cart", {
+        method: "POST",
+        body: { product_id: product.id, quantity, selected_variant: variant },
+      });
       toast.success("Añadido al carrito");
-      
-    } catch (error) {
-      console.error("Error adding item:", error);
+    } catch {
       toast.error("Error al agregar al carrito");
     } finally {
       setIsLoading(false);
@@ -106,13 +81,11 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
 
   const removeItem = async (productId: string) => {
     if (!user) return;
-
     setIsLoading(true);
     try {
-      setItems(currentItems => currentItems.filter(item => item.product.id !== productId));
-      await removeFromCart(user.id, productId);
-    } catch (error) {
-      console.error("Error removing item:", error);
+      setItems((curr) => curr.filter((i) => i.product.id !== productId));
+      await authFetch(`/api/cart/${productId}`, { method: "DELETE" });
+    } catch {
       toast.error("Error al eliminar del carrito");
     } finally {
       setIsLoading(false);
@@ -120,46 +93,31 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateQuantity = async (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      await removeItem(productId);
-      return;
-    }
-
+    if (quantity <= 0) { await removeItem(productId); return; }
     if (!user) return;
-
     try {
-      setItems(currentItems => 
-        currentItems.map(item => 
-          item.product.id === productId 
-            ? { ...item, quantity }
-            : item
-        )
-      );
-      await updateCartItemQuantity(user.id, productId, quantity);
-    } catch (error) {
-      console.error("Error updating quantity:", error);
+      setItems((curr) => curr.map((i) => (i.product.id === productId ? { ...i, quantity } : i)));
+      await authFetch(`/api/cart/${productId}`, { method: "PUT", body: { quantity } });
+    } catch {
+      console.error("Error updating quantity");
     }
   };
 
   const clearCart = async () => {
-    if (!user) {
-      setItems([]);
-      return;
-    }
-
+    if (!user) { setItems([]); return; }
     setIsLoading(true);
     try {
       setItems([]);
-      await clearCartAction(user.id);
-    } catch (error) {
-      console.error("Error clearing cart:", error);
+      await authFetch("/api/cart", { method: "DELETE" });
+    } catch {
+      console.error("Error clearing cart");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const total = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <SkatingCartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, total, itemCount, isLoading }}>
@@ -170,8 +128,6 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
 
 export function useSkatingCart() {
   const context = useContext(SkatingCartContext);
-  if (context === undefined) {
-    throw new Error('useSkatingCart must be used within a SkatingCartProvider');
-  }
+  if (!context) throw new Error("useSkatingCart must be used within SkatingCartProvider");
   return context;
 }

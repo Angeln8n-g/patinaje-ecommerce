@@ -1,4 +1,5 @@
 import { getProductByIdServer, getProductReviewsServer } from "@/lib/skating-store/product-queries";
+import { getProductsServer } from "@/lib/skating-store/product-queries";
 import { ProductGallery } from "@/components/skating-store/products/ProductGallery";
 import { ProductActions } from "@/components/skating-store/products/ProductActions";
 import { ProductReviews } from "@/components/skating-store/products/ProductReviews";
@@ -6,7 +7,6 @@ import { notFound } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Star, ShieldCheck, MessageCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 
 export const dynamicParams = true;
 
@@ -15,13 +15,12 @@ interface ProductPageProps {
 }
 
 export async function generateStaticParams() {
-  const supabase = createClient();
-  const { data: products } = await supabase
-    .from("skating_products")
-    .select("id");
-  return (products || []).map((product) => ({
-    id: product.id,
-  }));
+  try {
+    const products = await getProductsServer();
+    return products.map((product) => ({ id: product.id }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {

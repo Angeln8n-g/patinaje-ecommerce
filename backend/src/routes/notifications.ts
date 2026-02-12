@@ -8,9 +8,10 @@ const router = Router();
 router.get("/", requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 50;
     const result = await query(
-      "SELECT * FROM skating_notifications WHERE user_id = $1 ORDER BY created_at DESC",
-      [userId]
+      "SELECT * FROM skating_notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [userId, limit]
     );
     res.json(result.rows);
   } catch (err) {
@@ -18,21 +19,29 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
+// PUT /api/notifications/read-all
+router.put("/read-all", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    await query("UPDATE skating_notifications SET is_read = TRUE WHERE user_id = $1", [userId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Error al marcar notificaciones" });
+  }
+});
+
 // PUT /api/notifications/:id/read
 router.put("/:id/read", requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    await query(
-      "UPDATE skating_notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2",
-      [req.params.id, userId]
-    );
+    await query("UPDATE skating_notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2", [req.params.id, userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Error al marcar notificación" });
   }
 });
 
-// POST /api/notifications — internal: create notification (system use)
+// POST /api/notifications — create notification (system use)
 router.post("/", requireAuth, async (req, res) => {
   try {
     const { user_id, order_id, title, message, type } = req.body;

@@ -1,344 +1,79 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { DeliveryZone, StoreLocation } from "@/types/skating-store";
 import { validateCoordinates, isPointInPolygon } from "./geo-utils";
 
-// ─── Store Location ─────────────────────────────────────────────────────────
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.hunykho.com";
 
-/**
- * Retrieves the store location from the `static_content` table (slug: "store-location").
- *
- * @returns The store location or `null` if not configured.
- */
+async function apiFetch(endpoint: string, options: { method?: string; body?: any } = {}) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("skating_token")?.value || null;
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    method: options.method || "GET",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `API Error: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function getStoreLocation(): Promise<StoreLocation | null> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("static_content")
-    .select("data")
-    .eq("slug", "store-location")
-    .single();
-
-  if (error) {
-    console.error("Error fetching store location:", error);
-    return null;
-  }
-
-  if (!data?.data) return null;
-
-  return data.data as StoreLocation;
+  try {
+    const data = await apiFetch("/api/content/static/store-location");
+    if (!data?.data) return null;
+    return data.data as StoreLocation;
+  } catch { return null; }
 }
 
-/**
- * Saves (upserts) the store location in the `static_content` table.
- * Validates coordinates before persisting.
- *
- * @returns `{ success: true }` on success, or throws / returns an error object.
- */
-export async function saveStoreLocation(
-  lat: number,
-  lng: number,
-  address: string
-): Promise<{ success: true } | { success: false; error: string }> {
-  // Validate coordinates before saving
+export async function saveStoreLocation(lat: number, lng: number, address: string) {
   const validation = validateCoordinates(lat, lng);
-  if (!validation.valid) {
-    return { success: false, error: validation.error };
-  }
-
-  const supabase = await createClient();
-
-  // Verify admin role
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
-
-  const storeLocation: StoreLocation = { lat, lng, address };
-
-  const { error } = await supabase
-    .from("static_content")
-    .upsert(
-      {
-        slug: "store-location",
-        data: storeLocation,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "slug" }
-    );
-
-  if (error) {
-    console.error("Error saving store location:", error);
-    throw new Error("Failed to save store location");
-  }
-
-  return { success: true };
+  if (!validation.valid) return { success: false as const, error: validation.error };
+  await apiFetch("/api/content/static/store-location", { method: "PUT", body: { data: { lat, lng, address } } });
+  return { success: true as const };
 }
 
-// ─── Delivery Zones ─────────────────────────────────────────────────────────
-
-/**
- * Retrieves all delivery zones, ordered by creation date (newest first).
- */
 export async function getDeliveryZones(): Promise<DeliveryZone[]> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("delivery_zones")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error fetching delivery zones:", error);
-    return [];
-  }
-
-  return data as DeliveryZone[];
+  try { return await apiFetch("/api/delivery/zones"); } catch { return []; }
 }
 
-/**
- * Creates a new delivery zone.
- *
- * @param name    - Display name for the zone.
- * @param polygon - Array of vertices (at least 3) defining the zone polygon.
- */
-export async function createDeliveryZone(
-  name: string,
-  polygon: Array<{ lat: number; lng: number }>
-): Promise<{ success: true; data: DeliveryZone } | { success: false; error: string }> {
-  if (!name || name.trim().length === 0) {
-    return { success: false, error: "El nombre de la zona es requerido" };
-  }
-
-  if (!polygon || polygon.length < 3) {
-    return {
-      success: false,
-      error: "El polígono debe tener al menos 3 vértices",
-    };
-  }
-
-  const supabase = await createClient();
-
-  // Verify admin role
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
-
-  const { data, error } = await supabase
-    .from("delivery_zones")
-    .insert([
-      {
-        name: name.trim(),
-        polygon,
-        is_active: true,
-      },
-    ])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating delivery zone:", error);
-    throw new Error("Failed to create delivery zone");
-  }
-
-  return { success: true, data: data as DeliveryZone };
+export async function createDeliveryZone(name: string, polygon: Array<{ lat: number; lng: number }>) {
+  if (!name?.trim()) return { success: false as const, error: "El nombre de la zona es requerido" };
+  if (!polygon || polygon.length < 3) return { success: false as const, error: "El polígono debe tener al menos 3 vértices" };
+  const data = await apiFetch("/api/delivery/zones", { method: "POST", body: { name: name.trim(), polygon, is_active: true } });
+  return { success: true as const, data: data as DeliveryZone };
 }
 
-/**
- * Updates an existing delivery zone's name and/or polygon vertices.
- */
-export async function updateDeliveryZone(
-  id: string,
-  updates: { name?: string; polygon?: Array<{ lat: number; lng: number }> }
-): Promise<{ success: true } | { success: false; error: string }> {
-  if (updates.name !== undefined && updates.name.trim().length === 0) {
-    return { success: false, error: "El nombre de la zona es requerido" };
-  }
-
-  if (updates.polygon !== undefined && updates.polygon.length < 3) {
-    return {
-      success: false,
-      error: "El polígono debe tener al menos 3 vértices",
-    };
-  }
-
-  const supabase = await createClient();
-
-  // Verify admin role
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
-
-  const updateData: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
-
-  if (updates.name !== undefined) {
-    updateData.name = updates.name.trim();
-  }
-  if (updates.polygon !== undefined) {
-    updateData.polygon = updates.polygon;
-  }
-
-  const { error } = await supabase
-    .from("delivery_zones")
-    .update(updateData)
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error updating delivery zone:", error);
-    throw new Error("Failed to update delivery zone");
-  }
-
-  return { success: true };
+export async function updateDeliveryZone(id: string, updates: { name?: string; polygon?: Array<{ lat: number; lng: number }> }) {
+  if (updates.name !== undefined && !updates.name.trim()) return { success: false as const, error: "El nombre de la zona es requerido" };
+  if (updates.polygon !== undefined && updates.polygon.length < 3) return { success: false as const, error: "El polígono debe tener al menos 3 vértices" };
+  await apiFetch(`/api/delivery/zones/${id}`, { method: "PUT", body: updates });
+  return { success: true as const };
 }
 
-/**
- * Deletes a delivery zone by id.
- */
-export async function deleteDeliveryZone(
-  id: string
-): Promise<{ success: true }> {
-  const supabase = await createClient();
-
-  // Verify admin role
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
-
-  const { error } = await supabase
-    .from("delivery_zones")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting delivery zone:", error);
-    throw new Error("Failed to delete delivery zone");
-  }
-
-  return { success: true };
+export async function deleteDeliveryZone(id: string) {
+  await apiFetch(`/api/delivery/zones/${id}`, { method: "DELETE" });
+  return { success: true as const };
 }
 
-/**
- * Toggles the active/inactive state of a delivery zone without modifying
- * its name or polygon vertices.
- */
-export async function toggleDeliveryZone(
-  id: string,
-  isActive: boolean
-): Promise<{ success: true }> {
-  const supabase = await createClient();
-
-  // Verify admin role
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "ADMIN") throw new Error("Unauthorized: Admin only");
-
-  const { error } = await supabase
-    .from("delivery_zones")
-    .update({
-      is_active: isActive,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error toggling delivery zone:", error);
-    throw new Error("Failed to toggle delivery zone");
-  }
-
-  return { success: true };
+export async function toggleDeliveryZone(id: string, isActive: boolean) {
+  await apiFetch(`/api/delivery/zones/${id}`, { method: "PUT", body: { is_active: isActive } });
+  return { success: true as const };
 }
 
-// ─── Zone Validation ────────────────────────────────────────────────────────
-
-/**
- * Validates whether a geographic point (lat, lng) falls inside any **active**
- * delivery zone.
- *
- * Used during checkout to verify the customer's address is within coverage.
- *
- * @returns An object indicating whether the point is inside a zone, and if so,
- *          which zone matched.
- */
-export async function validateDeliveryZone(
-  lat: number,
-  lng: number
-): Promise<
-  | { inZone: true; zoneName: string }
-  | { inZone: false }
-> {
-  const supabase = await createClient();
-
-  // Fetch only active zones
-  const { data: zones, error } = await supabase
-    .from("delivery_zones")
-    .select("*")
-    .eq("is_active", true);
-
-  if (error) {
-    console.error("Error fetching delivery zones for validation:", error);
-    // Graceful degradation: if we can't fetch zones, allow the order
-    return { inZone: false };
-  }
-
-  if (!zones || zones.length === 0) {
-    // No active zones configured — allow the order (graceful degradation)
-    return { inZone: false };
-  }
-
-  const point = { lat, lng };
-
-  for (const zone of zones as DeliveryZone[]) {
-    if (isPointInPolygon(point, zone.polygon)) {
-      return { inZone: true, zoneName: zone.name };
+export async function validateDeliveryZone(lat: number, lng: number) {
+  try {
+    const zones = await apiFetch("/api/delivery/zones");
+    const activeZones = (zones || []).filter((z: DeliveryZone) => z.is_active);
+    if (activeZones.length === 0) return { inZone: false as const };
+    const point = { lat, lng };
+    for (const zone of activeZones) {
+      const polygon = typeof zone.polygon === "string" ? JSON.parse(zone.polygon) : zone.polygon;
+      if (isPointInPolygon(point, polygon)) return { inZone: true as const, zoneName: zone.name };
     }
-  }
-
-  return { inZone: false };
+    return { inZone: false as const };
+  } catch { return { inZone: false as const }; }
 }

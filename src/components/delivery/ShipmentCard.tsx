@@ -102,9 +102,8 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
   const handleSendInvoice = async () => {
     setIsLoading(true);
     try {
-      // Obtenemos el email del usuario del pedido o del perfil
-      const { data: { user } } = await (await import('@/lib/supabase/client')).createClient().auth.getUser();
-      const customerEmail = order.user_email || order.customer_email || user?.email;
+      // Get customer email from order data
+      const customerEmail = order.shipping?.email || order.customer_email || order.user_email;
       
       if (!customerEmail) {
         toast.error("No se encontró el email del cliente");

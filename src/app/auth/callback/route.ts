@@ -1,27 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
+// Auth callback is no longer needed with JWT auth.
+// Redirect to store.
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/skating-store'
-
-  if (code) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host')
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
-      }
-    }
-  }
-
-  // Redirect to confirm page which handles errors gracefully
-  return NextResponse.redirect(`${origin}/auth/confirm`)
+  const { origin } = new URL(request.url);
+  return NextResponse.redirect(`${origin}/skating-store`);
 }

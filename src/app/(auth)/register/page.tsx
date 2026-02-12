@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -35,7 +35,7 @@ export default function RegisterPage() {
   const [showRegisterSuccess, setShowRegisterSuccess] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const { signUp } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,19 +50,9 @@ export default function RegisterPage() {
     setIsLoading(true);
     setShouldShake(false);
     try {
-      const { error } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      setShowRegisterSuccess(true);
+      await signUp(values.email, values.password);
+      toast.success("¡Cuenta creada exitosamente!");
+      router.push("/skating-store");
     } catch (error: any) {
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 500);

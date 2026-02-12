@@ -1,80 +1,41 @@
-import { createClient } from "@/lib/supabase/server";
+import { serverFetch } from "@/lib/api/server";
 import { Product } from "@/types/skating-store";
 
 export async function getProductByIdServer(id: string): Promise<Product | null> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("skating_products")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    console.error("Error fetching product:", error.message, error.code);
+  try {
+    return await serverFetch<Product>(`/api/products/${id}`);
+  } catch {
     return null;
   }
-
-  return data as Product;
 }
 
 export async function getProductsServer(): Promise<Product[]> {
-  const supabase = await createClient();
-
-  const { data, error, count, status, statusText } = await supabase
-    .from("skating_products")
-    .select("*", { count: "exact" })
-    .order("created_at", { ascending: false });
-
-  console.log("[getProductsServer] status:", status, statusText, "count:", count, "rows:", data?.length, "error:", error);
-
-  if (error) {
-    console.error("[getProductsServer] ERROR:", JSON.stringify(error));
+  try {
+    return await serverFetch<Product[]>("/api/products");
+  } catch {
     return [];
   }
-
-  return (data || []) as Product[];
 }
 
-export async function getProductsFilteredServer(category?: string | null, search?: string | null): Promise<Product[]> {
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("skating_products")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (category) {
-    query = query.eq("category", category);
-  }
-
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Error fetching products:", error);
+export async function getProductsFilteredServer(
+  category?: string | null,
+  search?: string | null
+): Promise<Product[]> {
+  try {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    if (search) params.set("search", search);
+    const qs = params.toString();
+    return await serverFetch<Product[]>(`/api/products${qs ? `?${qs}` : ""}`);
+  } catch {
     return [];
   }
-
-  return (data || []) as Product[];
 }
 
 export async function getProductReviewsServer(productId: string) {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("skating_product_reviews")
-    .select("*")
-    .eq("product_id", productId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error fetching reviews:", error);
+  try {
+    return await serverFetch(`/api/reviews/${productId}`);
+  } catch {
     return [];
   }
-
-  return data || [];
 }

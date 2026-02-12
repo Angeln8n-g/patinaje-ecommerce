@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [showEmailNotConfirmed, setShowEmailNotConfirmed] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const { signIn } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,39 +48,16 @@ export default function LoginPage() {
     setIsLoading(true);
     setShouldShake(false);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
-      });
+      const user = await signIn(values.email, values.password);
 
-      if (error) {
-        if (error.message.toLowerCase().includes("confirm") || error.message.toLowerCase().includes("verified")) {
-          setShowEmailNotConfirmed(true);
-          return;
-        }
-        throw error;
-      }
+      toast.success("¡Bienvenido de nuevo!");
 
-      // Check user role to redirect accordingly
-      const { data: { user: loggedUser } } = await supabase.auth.getUser();
-      if (loggedUser) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", loggedUser.id)
-          .single();
-
-        toast.success("¡Bienvenido de nuevo!");
-
-        if (profile?.role === "ADMIN") {
-          router.push("/admin");
-        } else if (profile?.role === "SELLER") {
-          router.push("/seller");
-        } else if (profile?.role === "DELIVERY") {
-          router.push("/delivery");
-        } else {
-          router.push("/skating-store");
-        }
+      if (user.role === "ADMIN") {
+        router.push("/admin");
+      } else if (user.role === "SELLER") {
+        router.push("/seller");
+      } else if (user.role === "DELIVERY") {
+        router.push("/delivery");
       } else {
         router.push("/skating-store");
       }
@@ -109,27 +86,7 @@ export default function LoginPage() {
       return;
     }
 
-    setIsResetting(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-      });
-      
-      if (error) {
-        if (error.message.toLowerCase().includes("not found") || error.message.toLowerCase().includes("not registered")) {
-          setShowNotRegistered(true);
-          return;
-        }
-        throw error;
-      }
-      
-      setShowResetSuccess(true);
-    } catch (error: any) {
-      console.error("Error en resetPassword:", error);
-      toast.error(error.message || "Error al enviar el enlace de recuperación");
-    } finally {
-      setIsResetting(false);
-    }
+    toast.info("Funcionalidad de recuperación de contraseña próximamente");
   };
 
   return (
