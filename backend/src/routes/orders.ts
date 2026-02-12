@@ -4,6 +4,17 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 
 const router = Router();
 
+// Helper: parse numeric fields from PostgreSQL strings
+function parseOrder(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    total: row.total != null ? parseFloat(row.total) : 0,
+    shipping_lat: row.shipping_lat != null ? parseFloat(row.shipping_lat) : null,
+    shipping_lng: row.shipping_lng != null ? parseFloat(row.shipping_lng) : null,
+  };
+}
+
 // POST /api/orders — create order (authenticated)
 router.post("/", requireAuth, async (req, res) => {
   try {
@@ -14,7 +25,7 @@ router.post("/", requireAuth, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [userId, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, JSON.stringify(items), total, payment_method || 'card', shipping_lat, shipping_lng]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(parseOrder(result.rows[0]));
   } catch (err) {
     console.error("Create order error:", err);
     res.status(500).json({ error: "Error al crear pedido" });
@@ -87,7 +98,7 @@ router.post("/pos", requireAuth, requireRole("SELLER"), async (req, res) => {
       return newOrder;
     });
 
-    res.status(201).json(order);
+    res.status(201).json(parseOrder(order));
   } catch (err: any) {
     console.error("Create POS order error:", err);
     res.status(400).json({ error: err.message || "Error al crear pedido POS" });
@@ -155,7 +166,7 @@ router.get("/my", requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
     const result = await query("SELECT * FROM skating_orders WHERE user_id = $1 ORDER BY created_at DESC", [userId]);
-    res.json(result.rows);
+    res.json(result.rows.map(parseOrder));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener pedidos" });
   }
@@ -179,7 +190,7 @@ router.get("/seller", requireAuth, requireRole("SELLER"), async (req, res) => {
 
     sql += " ORDER BY created_at ASC";
     const result = await query(sql, params);
-    res.json(result.rows);
+    res.json(result.rows.map(parseOrder));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener pedidos" });
   }
@@ -193,7 +204,7 @@ router.get("/with-shipments", requireAuth, requireRole("ADMIN"), async (_req, re
        LEFT JOIN shipments s ON s.order_id = o.id
        ORDER BY o.created_at DESC`
     );
-    res.json(result.rows);
+    res.json(result.rows.map((r: any) => ({ ...parseOrder(r), shipment: r.shipment })));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener pedidos con envíos" });
   }
@@ -203,7 +214,7 @@ router.get("/with-shipments", requireAuth, requireRole("ADMIN"), async (_req, re
 router.get("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const result = await query("SELECT * FROM skating_orders ORDER BY created_at DESC");
-    res.json(result.rows);
+    res.json(result.rows.map(parseOrder));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener pedidos" });
   }
@@ -214,7 +225,7 @@ router.get("/:id", requireAuth, async (req, res) => {
   try {
     const result = await query("SELECT * FROM skating_orders WHERE id = $1", [req.params.id]);
     if (result.rows.length === 0) { res.status(404).json({ error: "Pedido no encontrado" }); return; }
-    res.json(result.rows[0]);
+    res.json(parseOrder(result.rows[0]));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener pedido" });
   }
@@ -241,7 +252,7 @@ router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res)
       "UPDATE skating_orders SET " + sets.join(", ") + " WHERE id = $" + idx + " RETURNING *", params
     );
     if (result.rows.length === 0) { res.status(404).json({ error: "Pedido no encontrado" }); return; }
-    res.json(result.rows[0]);
+    res.json(parseOrder(result.rows[0]));
   } catch (err) {
     console.error("Update order error:", err);
     res.status(500).json({ error: "Error al actualizar pedido" });

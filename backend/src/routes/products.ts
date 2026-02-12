@@ -4,6 +4,19 @@ import { requireAuth, requireRole } from "../lib/auth.js";
 
 const router = Router();
 
+// Helper: parse numeric fields that PostgreSQL returns as strings
+function parseProduct(row: any) {
+  if (!row) return row;
+  return {
+    ...row,
+    price: row.price != null ? parseFloat(row.price) : 0,
+    purchase_price: row.purchase_price != null ? parseFloat(row.purchase_price) : null,
+    stock: row.stock != null ? parseInt(row.stock) : 0,
+    images: Array.isArray(row.images) ? row.images : [],
+    variant_options: Array.isArray(row.variant_options) ? row.variant_options : [],
+  };
+}
+
 // GET /api/products — public, list all products
 router.get("/", async (req, res) => {
   try {
@@ -27,7 +40,7 @@ router.get("/", async (req, res) => {
 
     sql += " ORDER BY created_at DESC";
     const result = await query(sql, params);
-    res.json(result.rows);
+    res.json(result.rows.map(parseProduct));
   } catch (err) {
     console.error("Get products error:", err);
     res.status(500).json({ error: "Error al obtener productos" });
@@ -38,7 +51,7 @@ router.get("/", async (req, res) => {
 router.get("/barcode/:barcode", async (req, res) => {
   try {
     const result = await query("SELECT * FROM skating_products WHERE barcode = $1", [req.params.barcode]);
-    res.json(result.rows[0] || null);
+    res.json(result.rows[0] ? parseProduct(result.rows[0]) : null);
   } catch (err) {
     res.status(500).json({ error: "Error al buscar por código" });
   }
@@ -55,14 +68,14 @@ router.get("/search-pos", requireAuth, requireRole("SELLER"), async (req, res) =
       "SELECT * FROM skating_products WHERE status = 'active' AND stock > 0 AND barcode = $1 LIMIT 1",
       [searchTerm]
     );
-    if (barcodeResult.rows.length > 0) { res.json(barcodeResult.rows); return; }
+    if (barcodeResult.rows.length > 0) { res.json(barcodeResult.rows.map(parseProduct)); return; }
 
     // Fallback to name search
     const result = await query(
       "SELECT * FROM skating_products WHERE status = 'active' AND stock > 0 AND name ILIKE $1 ORDER BY name LIMIT 20",
       ["%" + searchTerm + "%"]
     );
-    res.json(result.rows);
+    res.json(result.rows.map(parseProduct));
   } catch (err) {
     res.status(500).json({ error: "Error al buscar productos" });
   }
@@ -76,7 +89,7 @@ router.get("/:id", async (req, res) => {
       res.status(404).json({ error: "Producto no encontrado" });
       return;
     }
-    res.json(result.rows[0]);
+    res.json(parseProduct(result.rows[0]));
   } catch (err) {
     console.error("Get product error:", err);
     res.status(500).json({ error: "Error al obtener producto" });
@@ -93,7 +106,7 @@ router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
        RETURNING *`,
       [name, description, price, category, images || [], stock || 0, featured || false, barcode, variant_type || 'none', variant_options || [], status || 'active', subcategory, unit_type, supplier, purchase_price]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(parseProduct(result.rows[0]));
   } catch (err: any) {
     console.error("Create product error:", err);
     res.status(500).json({ error: "Error al crear producto" });
@@ -122,7 +135,7 @@ router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res)
       params
     );
     if (result.rows.length === 0) { res.status(404).json({ error: "Producto no encontrado" }); return; }
-    res.json(result.rows[0]);
+    res.json(parseProduct(result.rows[0]));
   } catch (err) {
     console.error("Update product error:", err);
     res.status(500).json({ error: "Error al actualizar producto" });
