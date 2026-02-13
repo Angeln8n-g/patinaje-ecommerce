@@ -118,6 +118,10 @@ export async function confirmCashPayment(orderId: string, qrToken: string) {
   });
 }
 
+export async function cancelOrderByDelay(orderId: string) {
+  return authFetch(`/api/orders/${orderId}/cancel`, { method: "POST" });
+}
+
 export async function createContactMessage(message: Omit<ContactMessage, "id" | "created_at">) {
   return apiClient("/api/contact", { method: "POST", body: message });
 }

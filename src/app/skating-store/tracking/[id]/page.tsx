@@ -7,7 +7,7 @@ import { Order, StoreLocation } from "@/types/skating-store";
 import { haversineDistance, calculateEstimatedTime, formatEstimatedTime } from "@/lib/skating-store/geo-utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, Truck, CheckCircle2, MapPin, Banknote, QrCode, Clock, Phone, Star, Timer } from "lucide-react";
+import { Loader2, Package, Truck, CheckCircle2, MapPin, Banknote, QrCode, Clock, Phone, Star, Timer, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -120,9 +120,10 @@ export default function OrderTrackingPage() {
   );
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === order.status);
-  const showQr = (order.payment_method === "cash" || order.payment_method === "card") && order.payment_status !== "paid" && order.status !== "delivered";
-  const showNoDeliveryMsg = !deliveryManId && order.status !== "delivered" && order.status !== "pending";
-  const showEta = !!etaText && !!deliveryManId && shipmentStatus !== "ENTREGADO" && order.status !== "delivered";
+  const isCancelled = order.status === "cancelled";
+  const showQr = !isCancelled && (order.payment_method === "cash" || order.payment_method === "card") && order.payment_status !== "paid" && order.status !== "delivered";
+  const showNoDeliveryMsg = !isCancelled && !deliveryManId && order.status !== "delivered" && order.status !== "pending";
+  const showEta = !isCancelled && !!etaText && !!deliveryManId && shipmentStatus !== "ENTREGADO" && order.status !== "delivered";
 
   return (
     <div className="container py-8 max-w-4xl mx-auto space-y-8">
@@ -135,8 +136,8 @@ export default function OrderTrackingPage() {
             <h1 className="text-3xl font-black italic uppercase tracking-tighter mb-2">Seguimiento de Pedido</h1>
             <div className="flex items-center gap-3">
               <p className="text-muted-foreground">ID: #{order.id.slice(0, 8)}</p>
-              <Badge className={cn("uppercase", order.status === "delivered" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-primary text-primary-foreground")}>
-                {STEPS.find((s) => s.id === order.status)?.label || order.status}
+              <Badge className={cn("uppercase", order.status === "delivered" ? "bg-emerald-500 hover:bg-emerald-600" : isCancelled ? "bg-red-500 hover:bg-red-600 text-white" : "bg-primary text-primary-foreground")}>
+                {isCancelled ? "Cancelado" : (STEPS.find((s) => s.id === order.status)?.label || order.status)}
               </Badge>
               {order.status === "delivered" && (
                 <Button size="sm" variant={hasRated ? "outline" : "default"} className="ml-auto" onClick={() => hasRated ? toast.info("Ya has valorado este pedido") : setShowRatingDialog(true)} disabled={hasRated}>
@@ -145,7 +146,15 @@ export default function OrderTrackingPage() {
               )}
             </div>
           </div>
-          {showEta && (
+          {isCancelled && (
+            <Card className="border-2 border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800 shadow-sm">
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg text-red-600 dark:text-red-400"><XCircle className="h-5 w-5" /></div>
+                <p className="font-semibold text-red-700 dark:text-red-300">Este pedido fue cancelado por retraso en la entrega.</p>
+              </CardContent>
+            </Card>
+          )}
+          {!isCancelled && showEta && (
             <Card className="border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800 shadow-sm">
               <CardContent className="flex items-center gap-3 py-4">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg text-blue-600 dark:text-blue-400"><Timer className="h-5 w-5" /></div>
@@ -161,6 +170,7 @@ export default function OrderTrackingPage() {
               </CardContent>
             </Card>
           )}
+          {!isCancelled && (
           <div className="relative pt-12 pb-8">
             <div className="absolute top-1/2 left-0 w-full h-1 bg-muted -translate-y-1/2 rounded-full" />
             <div className="absolute top-1/2 left-0 h-1 bg-primary -translate-y-1/2 rounded-full transition-all duration-1000 ease-in-out" style={{ width: `${(Math.max(0, currentStepIndex) / (STEPS.length - 1)) * 100}%` }} />
@@ -180,6 +190,7 @@ export default function OrderTrackingPage() {
               })}
             </div>
           </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {showQr && (
               <Card className="border-2 border-primary/20 shadow-lg md:col-span-2 overflow-hidden bg-muted/5">

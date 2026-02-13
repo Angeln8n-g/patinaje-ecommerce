@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, updateProfile, getUserOrders } from "@/lib/skating-store/supabase-queries";
+import { getProfile, updateProfile, getUserOrders, cancelOrderByDelay } from "@/lib/skating-store/supabase-queries";
 import { authFetch } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock, Store } from "lucide-react";
+import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock, Store, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Order } from "@/types/skating-store";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ const STATUS_MAP = {
   confirmed: { label: "Confirmado", icon: CheckCircle2, color: "bg-blue-100 text-blue-700" },
   shipped: { label: "En camino", icon: Truck, color: "bg-purple-100 text-purple-700" },
   delivered: { label: "Entregado", icon: Package, color: "bg-green-100 text-green-700" },
+  cancelled: { label: "Cancelado", icon: XCircle, color: "bg-red-100 text-red-700" },
 };
 
 export default function ProfilePage() {
@@ -30,6 +31,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setSavingPassword] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     first_name: "", last_name: "", phone: "",
     address_street: "", address_city: "", address_state: "",
@@ -81,6 +83,26 @@ export default function ProfilePage() {
     finally { setSavingPassword(false); }
   };
 
+  const canCancel = (order: Order) => {
+    if (order.status === "delivered" || order.status === "cancelled") return false;
+    const hoursDiff = (Date.now() - new Date(order.created_at).getTime()) / (1000 * 60 * 60);
+    return hoursDiff >= 24;
+  };
+
+  const handleCancel = async (orderId: string) => {
+    if (!confirm("¿Estás seguro de que deseas cancelar este pedido por retraso?")) return;
+    setCancellingId(orderId);
+    try {
+      await cancelOrderByDelay(orderId);
+      toast.success("Pedido cancelado exitosamente");
+      if (user) await loadOrders(user.id);
+    } catch (error: any) {
+      toast.error(error.message || "Error al cancelar el pedido");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   if (authLoading || loading) return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
@@ -118,7 +140,20 @@ export default function ProfilePage() {
                     <CardContent className="py-4">
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-muted-foreground">{order.items.length} {order.items.length === 1 ? "producto" : "productos"} • <span className="font-bold text-foreground">${order.total.toFixed(2)}</span></div>
-                        <Link href={`/skating-store/tracking/${order.id}`}><Button size="sm" variant="ghost" className="text-primary hover:text-primary hover:bg-primary/5 font-bold">Rastrear Pedido<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+                        <div className="flex items-center gap-2">
+                          {canCancel(order) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold"
+                              disabled={cancellingId === order.id}
+                              onClick={() => handleCancel(order.id)}
+                            >
+                              {cancellingId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="mr-1 h-4 w-4" />Cancelar</>}
+                            </Button>
+                          )}
+                          <Link href={`/skating-store/tracking/${order.id}`}><Button size="sm" variant="ghost" className="text-primary hover:text-primary hover:bg-primary/5 font-bold">Rastrear Pedido<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

@@ -36,7 +36,7 @@ export async function generateAndSendInvoice(orderId: string, customerEmail: str
     if (resend && customerEmail) {
       const date = new Date();
       await resend.emails.send({
-        from: "RD Patina <onboarding@resend.dev>",
+        from: "RD Patina <noreply@hunykho.com>",
         to: customerEmail,
         subject: `Tu Factura ${invoiceNumber} - RD Patina`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">

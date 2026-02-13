@@ -92,7 +92,7 @@ export interface Order {
   items: CartItem[];
   shipping: ShippingInfo;
   total: number;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
+  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   payment_method: 'card' | 'cash';
   payment_status: 'pending' | 'paid' | 'failed';
   qr_token?: string;

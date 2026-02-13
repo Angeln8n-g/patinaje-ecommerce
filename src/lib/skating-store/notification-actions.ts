@@ -81,7 +81,7 @@ export async function sendOrderNotification({
 
   try {
     const { error } = await resend.emails.send({
-      from: 'RD Patina <onboarding@resend.dev>',
+      from: 'RD Patina <noreply@hunykho.com>',
       to: customerEmail,
       subject: subject,
       html: `

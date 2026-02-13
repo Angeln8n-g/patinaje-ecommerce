@@ -231,10 +231,70 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 });
 
-// PUT /api/orders/:id — update order (admin/seller)
-router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res) => {
+// POST /api/orders/:id/cancel — user cancels order after 24h delay
+router.post("/:id/cancel", requireAuth, async (req, res) => {
   try {
+    const userId = (req as any).user.userId;
+    const orderId = req.params.id;
+
+    const result = await query("SELECT * FROM skating_orders WHERE id = $1", [orderId]);
+    if (result.rows.length === 0) { res.status(404).json({ error: "Pedido no encontrado" }); return; }
+
+    const order = result.rows[0];
+
+    // Only the order owner can cancel
+    if (order.user_id !== userId) { res.status(403).json({ error: "No puedes cancelar este pedido" }); return; }
+
+    // Cannot cancel already delivered or cancelled orders
+    if (order.status === "delivered") { res.status(400).json({ error: "El pedido ya fue entregado" }); return; }
+    if (order.status === "cancelled") { res.status(400).json({ error: "El pedido ya está cancelado" }); return; }
+
+    // Must have passed 24 hours since creation
+    const createdAt = new Date(order.created_at);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+    if (hoursDiff < 24) {
+      res.status(400).json({ error: "Solo puedes cancelar después de 24 horas sin entrega" });
+      return;
+    }
+
+    const updated = await query(
+      "UPDATE skating_orders SET status = 'cancelled' WHERE id = $1 RETURNING *",
+      [orderId]
+    );
+    res.json(parseOrder(updated.rows[0]));
+  } catch (err) {
+    console.error("Cancel order error:", err);
+    res.status(500).json({ error: "Error al cancelar el pedido" });
+  }
+});
+
+// PUT /api/orders/:id — update order (admin/seller/delivery)
+router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER", "DELIVERY"), async (req, res) => {
+  try {
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
     const fields = req.body;
+
+    // Delivery drivers can only update payment_status and qr_token on their assigned orders
+    if (userRole === "DELIVERY") {
+      const deliveryAllowed = ["payment_status", "qr_token"];
+      const invalidFields = Object.keys(fields).filter(k => !deliveryAllowed.includes(k));
+      if (invalidFields.length > 0) {
+        res.status(403).json({ error: "Repartidores solo pueden confirmar pagos" });
+        return;
+      }
+      // Verify the order is assigned to this delivery driver via shipments
+      const orderCheck = await query(
+        "SELECT s.delivery_man_id FROM shipments s WHERE s.order_id = $1 AND s.delivery_man_id = $2",
+        [req.params.id, userId]
+      );
+      if (orderCheck.rows.length === 0) {
+        res.status(403).json({ error: "Este pedido no está asignado a tu cuenta" });
+        return;
+      }
+    }
+
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
