@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function CheckoutPage() {
   const { items, total, clearCart } = useSkatingCart();
   const [isLoading, setIsLoading] = useState(false);
+  const [shippingCost, setShippingCost] = useState(0);
   const router = useRouter();
   const { user } = useAuth();
   const [initialValues, setInitialValues] = useState<Partial<ShippingInfo> | undefined>(undefined);
@@ -41,7 +42,7 @@ export default function CheckoutPage() {
     loadProfile();
   }, [user]);
 
-  const handleCheckout = async (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }) => {
+  const handleCheckout = async (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }, shippingTotal: number) => {
     setIsLoading(true);
     try {
       if (!user) {
@@ -50,8 +51,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Use coordinates from the delivery map picker if available;
-      // otherwise fall back to browser geolocation for proximity detection
       let shippingWithCoords = { ...data };
       if (!shippingWithCoords.lat || !shippingWithCoords.lng) {
         try {
@@ -61,13 +60,13 @@ export default function CheckoutPage() {
           shippingWithCoords.lat = position.coords.latitude;
           shippingWithCoords.lng = position.coords.longitude;
         } catch {
-          // Location not available — proximity detection won't work but order proceeds
+          // Location not available
         }
       }
 
-      const order = await createOrder(items, shippingWithCoords, total, data.paymentMethod);
+      const finalTotal = total + shippingTotal;
+      const order = await createOrder(items, shippingWithCoords, finalTotal, data.paymentMethod);
       
-      // Notificar al usuario que el pedido ha sido recibido (Email)
       try {
         await sendOrderNotification({
           orderId: order.id,
@@ -76,7 +75,6 @@ export default function CheckoutPage() {
           status: 'RECEIVED'
         });
         
-        // Notificación In-App
         await createInAppNotification({
           user_id: user.id,
           order_id: order.id,
@@ -88,13 +86,11 @@ export default function CheckoutPage() {
         console.error("Error sending initial order notification:", notifError);
       }
 
-      // Si el pago es con tarjeta, generar factura automáticamente
       if (data.paymentMethod === 'card') {
         try {
-          await generateAndSendInvoice(order.id, user.email || "", total);
+          await generateAndSendInvoice(order.id, user.email || "", finalTotal);
         } catch (invoiceError) {
           console.error("Error generating automatic invoice:", invoiceError);
-          // No bloqueamos el flujo principal si falla la factura
         }
       }
 
@@ -135,10 +131,11 @@ export default function CheckoutPage() {
                 initialValues={initialValues} 
                 disabled={!user}
                 onLogin={() => router.push("/login")}
+                onShippingCostChange={setShippingCost}
               />
             </div>
             <div>
-              <OrderSummary />
+              <OrderSummary shippingCost={shippingCost} />
             </div>
           </div>
         </>

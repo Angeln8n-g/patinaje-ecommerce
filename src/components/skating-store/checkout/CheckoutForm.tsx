@@ -13,11 +13,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button as UIButton } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Banknote, Loader2, CheckCircle2, XCircle, MapPin } from "lucide-react";
-import type { DeliveryLocationResult, PickerMode } from "./DeliveryLocationPicker";
+import { CreditCard, Banknote, Loader2 } from "lucide-react";
+import type { DeliveryLocationResult } from "./DeliveryLocationPicker";
 import { ShippingBreakdown } from "./ShippingBreakdown";
 import { calculateShippingCost } from "@/lib/skating-store/shipping-actions";
-import { validateDeliveryZone } from "@/lib/skating-store/zone-actions";
 
 const DeliveryLocationPicker = dynamic(
   () => import("./DeliveryLocationPicker"),
@@ -42,14 +41,15 @@ const formSchema = z.object({
 });
 
 interface CheckoutFormProps {
-  onSubmit: (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }) => Promise<void>;
+  onSubmit: (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }, shippingTotal: number) => Promise<void>;
   isLoading: boolean;
   initialValues?: Partial<ShippingInfo>;
   disabled?: boolean;
   onLogin?: () => void;
+  onShippingCostChange?: (cost: number) => void;
 }
 
-/** Geocode an address using Nominatim (OpenStreetMap). */
+/** Geocode an address string to coordinates using Nominatim. */
 async function geocodeAddress(address: string, city: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const q = encodeURIComponent(`${address}, ${city}`);
@@ -67,33 +67,21 @@ async function geocodeAddress(address: string, city: string): Promise<{ lat: num
   }
 }
 
-export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onLogin }: CheckoutFormProps) {
-  // Address geocoding state
-  const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [addressInZone, setAddressInZone] = useState<boolean | null>(null);
-  const [addressZoneName, setAddressZoneName] = useState<string | undefined>(undefined);
-  const [geocoding, setGeocoding] = useState(false);
-  const [geocodeError, setGeocodeError] = useState<string | null>(null);
-  const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onLogin, onShippingCostChange }: CheckoutFormProps) {
+  // Delivery location from map (click, GPS, or address geocode)
+  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocationResult | null>(null);
 
-  // Map picker mode: auto (address-based) or manual (user picks point)
-  const [pickerMode, setPickerMode] = useState<PickerMode>("auto");
-
-  // Manual delivery location from map picker (only used when out of zone)
-  const [manualLocation, setManualLocation] = useState<DeliveryLocationResult | null>(null);
-
-  // The effective delivery location: manual pick if out of zone, otherwise address coords
-  const effectiveLocation: DeliveryLocationResult | null =
-    pickerMode === "manual" && manualLocation
-      ? manualLocation
-      : addressCoords && addressInZone
-        ? { lat: addressCoords.lat, lng: addressCoords.lng, inZone: true, zoneName: addressZoneName }
-        : null;
+  // Geocoded coordinates from typed address → passed to map as external coords
+  const [geocodedCoords, setGeocodedCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Shipping cost state
   const [shippingCost, setShippingCost] = useState<ShippingCostResult | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+
+  // Track whether the map set the address (to avoid re-geocoding loop)
+  const mapSetAddress = useRef(false);
+  const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -110,87 +98,72 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
   const addressValue = form.watch("address");
   const cityValue = form.watch("city");
 
-  // Geocode address when address+city change (debounced)
+  // When user types address+city, geocode and send coords to map
   useEffect(() => {
+    if (mapSetAddress.current) {
+      mapSetAddress.current = false;
+      return;
+    }
+
     if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
-
-    // Reset state when fields change
-    setAddressCoords(null);
-    setAddressInZone(null);
-    setAddressZoneName(undefined);
-    setGeocodeError(null);
-    setPickerMode("auto");
-    setManualLocation(null);
-    setShippingCost(null);
-
     if (!addressValue || addressValue.length < 5 || !cityValue || cityValue.length < 2) return;
 
     geocodeTimer.current = setTimeout(async () => {
-      setGeocoding(true);
-      setGeocodeError(null);
-      try {
-        const coords = await geocodeAddress(addressValue, cityValue);
-        if (!coords) {
-          setGeocodeError("No pudimos ubicar tu dirección. Verifica que sea correcta.");
-          setGeocoding(false);
-          return;
-        }
-        setAddressCoords(coords);
-
-        // Check if address is inside delivery zone
-        const zoneResult = await validateDeliveryZone(coords.lat, coords.lng);
-        setAddressInZone(zoneResult.inZone);
-        setAddressZoneName(zoneResult.inZone ? zoneResult.zoneName : undefined);
-
-        if (!zoneResult.inZone) {
-          setPickerMode("manual");
-        }
-      } catch {
-        setGeocodeError("Error al verificar la dirección.");
-      } finally {
-        setGeocoding(false);
+      const coords = await geocodeAddress(addressValue, cityValue);
+      if (coords) {
+        setGeocodedCoords(coords);
       }
-    }, 1000);
+    }, 1200);
 
     return () => { if (geocodeTimer.current) clearTimeout(geocodeTimer.current); };
   }, [addressValue, cityValue]);
 
-  // Calculate shipping cost when effective location changes
+  // Calculate shipping cost when delivery location changes
   useEffect(() => {
     async function calculate() {
-      if (effectiveLocation && effectiveLocation.lat && effectiveLocation.lng) {
+      if (deliveryLocation?.lat && deliveryLocation?.lng) {
         setShippingLoading(true);
         setShippingError(null);
         try {
-          const result = await calculateShippingCost(effectiveLocation.lat, effectiveLocation.lng);
+          const result = await calculateShippingCost(deliveryLocation.lat, deliveryLocation.lng);
           if (result.success) {
             setShippingCost(result.data);
             setShippingError(null);
+            onShippingCostChange?.(result.data.total_cost);
           } else {
             setShippingCost(null);
             setShippingError(result.error);
+            onShippingCostChange?.(0);
           }
         } catch {
           setShippingCost(null);
           setShippingError("Error al calcular el costo de envío");
+          onShippingCostChange?.(0);
         } finally {
           setShippingLoading(false);
         }
       } else {
         setShippingCost(null);
         setShippingError(null);
+        onShippingCostChange?.(0);
       }
     }
     calculate();
-  }, [effectiveLocation?.lat, effectiveLocation?.lng]);
+  }, [deliveryLocation?.lat, deliveryLocation?.lng]);
 
   const handleLocationChange = useCallback((result: DeliveryLocationResult | null) => {
-    setManualLocation(result);
+    setDeliveryLocation(result);
   }, []);
 
-  // Block submit conditions
-  const isOutsideZone = effectiveLocation !== null && !effectiveLocation.inZone;
-  const needsManualPick = pickerMode === "manual" && !manualLocation;
+  // When the map resolves an address (reverse geocode from click/GPS), fill the form fields
+  const handleAddressResolve = useCallback((address: string, city: string) => {
+    mapSetAddress.current = true;
+    if (address) form.setValue("address", address, { shouldValidate: true });
+    if (city) form.setValue("city", city, { shouldValidate: true });
+  }, [form]);
+
+  const isOutsideZone = deliveryLocation !== null && !deliveryLocation.inZone;
+  const noLocation = deliveryLocation === null;
   const isShippingBlocked = shippingCost !== null && (
     shippingCost.zone_type === "out_of_range" ||
     (shippingCost.zone_type === "out_of_zone" && !shippingCost.out_of_zone_enabled)
@@ -199,10 +172,10 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
   const handleFormSubmit = async (data: z.infer<typeof formSchema>) => {
     const shippingData: ShippingInfo & { paymentMethod: 'card' | 'cash' } = {
       ...data,
-      lat: effectiveLocation?.lat,
-      lng: effectiveLocation?.lng,
+      lat: deliveryLocation?.lat,
+      lng: deliveryLocation?.lng,
     };
-    await onSubmit(shippingData);
+    await onSubmit(shippingData, shippingCost?.total_cost ?? 0);
   };
 
   return (
@@ -256,65 +229,15 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
           </FormItem>
         )} />
 
-        {/* Address verification status */}
-        <div className="pt-4 border-t space-y-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-medium">Verificación de Zona de Entrega</p>
-          </div>
-
-          {geocoding && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Verificando tu dirección...
-            </div>
-          )}
-
-          {geocodeError && (
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>{geocodeError}</AlertDescription>
-            </Alert>
-          )}
-
-          {!geocoding && addressInZone === true && (
-            <Alert className="border-green-200 bg-green-50">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-700">
-                ¡Tu dirección está dentro de la zona de entrega
-                {addressZoneName ? ` "${addressZoneName}"` : ""}! Entregaremos directamente en tu dirección.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {!geocoding && addressInZone === false && (
-            <Alert className="border-amber-200 bg-amber-50">
-              <XCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-700">
-                Tu dirección está fuera de nuestra zona de entrega. Selecciona un punto de encuentro dentro de la zona en el mapa.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {(!addressValue || addressValue.length < 5 || !cityValue || cityValue.length < 2) && !geocoding && (
-            <p className="text-xs text-muted-foreground italic">
-              Completa tu dirección y ciudad para verificar la zona de entrega.
-            </p>
-          )}
+        {/* Delivery Location Map — always visible */}
+        <div className="pt-4 border-t">
+          <DeliveryLocationPicker
+            onLocationChange={handleLocationChange}
+            onAddressResolve={handleAddressResolve}
+            disabled={disabled}
+            externalCoords={geocodedCoords}
+          />
         </div>
-
-        {/* Map picker: only shown when address is outside zone */}
-        {pickerMode === "manual" && (
-          <div className="pt-2">
-            <DeliveryLocationPicker
-              onLocationChange={handleLocationChange}
-              disabled={disabled}
-              addressCoords={addressCoords}
-              addressInZone={addressInZone ?? false}
-              mode="manual"
-            />
-          </div>
-        )}
 
         {/* Shipping Cost Breakdown */}
         {shippingCost && (
@@ -380,7 +303,7 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
             type="submit"
             className="w-full mt-6"
             size="lg"
-            disabled={isLoading || isOutsideZone || needsManualPick || isShippingBlocked || shippingLoading || geocoding}
+            disabled={isLoading || isOutsideZone || noLocation || isShippingBlocked || shippingLoading}
           >
             {isLoading ? "Procesando..." : "Confirmar Pedido"}
           </Button>

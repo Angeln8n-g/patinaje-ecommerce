@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -13,14 +13,16 @@ import {
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { validateDeliveryZone } from "@/lib/skating-store/zone-actions";
 import { getDeliveryZones } from "@/lib/skating-store/zone-actions";
 import { DeliveryZone } from "@/types/skating-store";
-import { CheckCircle2, XCircle, MapPin, Loader2, Navigation } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, LocateFixed, MapPin } from "lucide-react";
 
-const deliveryMarkerIcon = L.icon({
+// Green marker for in-zone
+const inZoneIcon = L.icon({
   iconUrl:
-    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
   iconSize: [25, 41],
@@ -29,9 +31,22 @@ const deliveryMarkerIcon = L.icon({
   shadowSize: [41, 41],
 });
 
-const addressMarkerIcon = L.icon({
+// Red marker for out-of-zone
+const outZoneIcon = L.icon({
   iconUrl:
     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+// Blue marker (default/loading)
+const defaultIcon = L.icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
   iconSize: [25, 41],
@@ -48,9 +63,9 @@ function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => v
   return null;
 }
 
-function FlyToPoint({ lat, lng }: { lat: number; lng: number }) {
+function FlyToPoint({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
   const map = useMap();
-  useEffect(() => { map.flyTo([lat, lng], 15, { duration: 1 }); }, [lat, lng, map]);
+  useEffect(() => { map.flyTo([lat, lng], zoom ?? 16, { duration: 1 }); }, [lat, lng, zoom, map]);
   return null;
 }
 
@@ -61,25 +76,41 @@ export interface DeliveryLocationResult {
   zoneName?: string;
 }
 
-export type PickerMode = "auto" | "manual";
-
 interface DeliveryLocationPickerProps {
   onLocationChange: (result: DeliveryLocationResult | null) => void;
+  onAddressResolve?: (address: string, city: string) => void;
   disabled?: boolean;
-  /** Address geocoded coordinates (from parent) */
-  addressCoords?: { lat: number; lng: number } | null;
-  /** Whether the geocoded address is inside a delivery zone */
-  addressInZone?: boolean;
-  /** Force showing the map for manual point selection (out-of-zone fallback) */
-  mode: PickerMode;
+  /** Coordinates from address geocoding — positions the pin without reverse geocoding */
+  externalCoords?: { lat: number; lng: number } | null;
+}
+
+/** Reverse geocode coordinates to an address string using Nominatim. */
+async function reverseGeocode(lat: number, lng: number): Promise<{ address: string; city: string } | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`
+    );
+    const data = await res.json();
+    if (data?.address) {
+      const a = data.address;
+      const road = a.road || a.pedestrian || a.footway || "";
+      const number = a.house_number || "";
+      const neighbourhood = a.neighbourhood || a.suburb || "";
+      const address = [road, number, neighbourhood].filter(Boolean).join(", ");
+      const city = a.city || a.town || a.village || a.municipality || "";
+      return { address: address || data.display_name?.split(",")[0] || "", city };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export default function DeliveryLocationPicker({
   onLocationChange,
+  onAddressResolve,
   disabled,
-  addressCoords,
-  addressInZone,
-  mode,
+  externalCoords,
 }: DeliveryLocationPickerProps) {
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
   const [selectedLng, setSelectedLng] = useState<number | null>(null);
@@ -90,6 +121,8 @@ export default function DeliveryLocationPicker({
   } | null>(null);
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [hasActiveZones, setHasActiveZones] = useState<boolean | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     async function loadZones() {
@@ -105,21 +138,13 @@ export default function DeliveryLocationPicker({
     loadZones();
   }, []);
 
-  // Reset manual selection when mode changes back to auto
-  useEffect(() => {
-    if (mode === "auto") {
-      setSelectedLat(null);
-      setSelectedLng(null);
-      setValidationResult(null);
-    }
-  }, [mode]);
-
-  const handleMapClick = useCallback(
-    async (lat: number, lng: number) => {
-      if (disabled || mode !== "manual") return;
+  const selectPoint = useCallback(
+    async (lat: number, lng: number, doReverse: boolean) => {
+      if (disabled) return;
 
       setSelectedLat(lat);
       setSelectedLng(lng);
+      setFlyTo({ lat, lng });
       setValidating(true);
       setValidationResult(null);
 
@@ -138,12 +163,59 @@ export default function DeliveryLocationPicker({
       } finally {
         setValidating(false);
       }
+
+      // Reverse geocode to fill address fields
+      if (doReverse && onAddressResolve) {
+        const resolved = await reverseGeocode(lat, lng);
+        if (resolved) {
+          onAddressResolve(resolved.address, resolved.city);
+        }
+      }
     },
-    [disabled, mode, onLocationChange]
+    [disabled, onLocationChange, onAddressResolve]
   );
 
-  // In auto mode, don't render the map at all
-  if (mode === "auto") return null;
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => selectPoint(lat, lng, true),
+    [selectPoint]
+  );
+
+  const handleLocateMe = useCallback(async () => {
+    if (disabled) return;
+    setLocating(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+      });
+      await selectPoint(position.coords.latitude, position.coords.longitude, true);
+    } catch {
+      // Geolocation failed — user can still click the map
+    } finally {
+      setLocating(false);
+    }
+  }, [disabled, selectPoint]);
+
+  // Determine marker icon based on validation
+  const markerIcon = validating
+    ? defaultIcon
+    : validationResult?.inZone
+      ? inZoneIcon
+      : validationResult !== null
+        ? outZoneIcon
+        : defaultIcon;
+
+  // When external coords arrive (from typed address geocoding), position pin without reverse geocode
+  const prevExternalRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!externalCoords) return;
+    const key = `${externalCoords.lat},${externalCoords.lng}`;
+    if (prevExternalRef.current === key) return;
+    prevExternalRef.current = key;
+    selectPoint(externalCoords.lat, externalCoords.lng, false);
+  }, [externalCoords, selectPoint]);
 
   if (hasActiveZones === false) return null;
 
@@ -156,25 +228,37 @@ export default function DeliveryLocationPicker({
     );
   }
 
-  const mapCenter: [number, number] = addressCoords
-    ? [addressCoords.lat, addressCoords.lng]
-    : DEFAULT_CENTER;
-
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Navigation className="h-4 w-4 text-amber-500" />
-        <p className="text-sm font-medium">Selecciona un punto de encuentro</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Ubicación de Entrega</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleLocateMe}
+          disabled={disabled || locating}
+          className="gap-1.5 text-xs"
+        >
+          {locating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <LocateFixed className="h-3.5 w-3.5" />
+          )}
+          {locating ? "Localizando..." : "Usar mi ubicación"}
+        </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Tu dirección está fuera de la zona de entrega. Haz clic en el mapa para
-        seleccionar un punto de encuentro dentro de las zonas marcadas.
+        Haz clic en el mapa, usa tu ubicación GPS, o escribe tu dirección arriba. Las zonas de entrega están marcadas en azul.
       </p>
 
-      <div className="h-[250px] w-full rounded-lg overflow-hidden border">
+      <div className="h-[280px] w-full rounded-lg overflow-hidden border">
         <MapContainer
-          center={mapCenter}
-          zoom={addressCoords ? 15 : DEFAULT_ZOOM}
+          center={DEFAULT_CENTER}
+          zoom={DEFAULT_ZOOM}
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
@@ -183,9 +267,7 @@ export default function DeliveryLocationPicker({
           />
           <MapClickHandler onClick={handleMapClick} />
 
-          {addressCoords && (
-            <FlyToPoint lat={addressCoords.lat} lng={addressCoords.lng} />
-          )}
+          {flyTo && <FlyToPoint lat={flyTo.lat} lng={flyTo.lng} />}
 
           {zones.map((zone) => (
             <Polygon
@@ -194,31 +276,20 @@ export default function DeliveryLocationPicker({
               pathOptions={{
                 color: "#3b82f6",
                 fillColor: "#3b82f6",
-                fillOpacity: 0.15,
+                fillOpacity: 0.12,
                 weight: 2,
               }}
-            >
-              <Popup>{zone.name}</Popup>
-            </Polygon>
+              interactive={false}
+            />
           ))}
 
-          {/* Address marker (red) */}
-          {addressCoords && (
-            <Marker position={[addressCoords.lat, addressCoords.lng]} icon={addressMarkerIcon}>
-              <Popup>
-                <div className="p-1">
-                  <p className="font-semibold text-red-600">Tu dirección (fuera de zona)</p>
-                </div>
-              </Popup>
-            </Marker>
-          )}
-
-          {/* Selected meeting point (blue) */}
           {selectedLat !== null && selectedLng !== null && (
-            <Marker position={[selectedLat, selectedLng]} icon={deliveryMarkerIcon}>
+            <Marker position={[selectedLat, selectedLng]} icon={markerIcon}>
               <Popup>
-                <div className="p-1">
-                  <p className="font-semibold">Punto de encuentro</p>
+                <div className="p-1 text-center">
+                  <p className="font-semibold text-sm">
+                    {validationResult?.inZone ? "✓ Dentro de zona" : validationResult !== null ? "✗ Fuera de zona" : "Verificando..."}
+                  </p>
                 </div>
               </Popup>
             </Marker>
@@ -226,6 +297,7 @@ export default function DeliveryLocationPicker({
         </MapContainer>
       </div>
 
+      {/* Validation status */}
       {validating && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -239,16 +311,15 @@ export default function DeliveryLocationPicker({
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-700">
-                ¡Punto de encuentro dentro de la zona
+                ¡Ubicación dentro de la zona de entrega
                 {validationResult.zoneName ? ` "${validationResult.zoneName}"` : ""}!
               </AlertDescription>
             </Alert>
           ) : (
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>
-                Este punto también está fuera de la zona. Selecciona un punto dentro
-                de las áreas marcadas en azul.
+            <Alert className="border-amber-200 bg-amber-50">
+              <XCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700">
+                Esta ubicación está fuera de la zona de entrega. Mueve el pin dentro de las áreas marcadas en azul.
               </AlertDescription>
             </Alert>
           )}
@@ -257,7 +328,7 @@ export default function DeliveryLocationPicker({
 
       {selectedLat === null && (
         <p className="text-xs text-muted-foreground italic">
-          Haz clic dentro de una zona azul para seleccionar tu punto de encuentro.
+          Selecciona tu ubicación en el mapa o usa el botón de GPS.
         </p>
       )}
     </div>
