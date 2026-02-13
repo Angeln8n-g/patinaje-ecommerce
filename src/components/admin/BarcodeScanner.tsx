@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5QrcodeScanner, Html5QrcodeScannerState } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { Camera, StopCircle } from "lucide-react";
@@ -13,39 +13,54 @@ interface BarcodeScannerProps {
 export function BarcodeScanner({ onScan, autoStart = false }: BarcodeScannerProps) {
   const [isScanning, setIsScanning] = useState(autoStart);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const onScanRef = useRef(onScan);
+
+  // Keep the callback ref updated without triggering effect re-runs
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
 
   useEffect(() => {
-    if (isScanning && !scannerRef.current) {
+    if (!isScanning) return;
+
+    // Small delay to ensure the DOM element is rendered
+    const timeoutId = setTimeout(() => {
+      if (scannerRef.current) return;
+
+      const container = document.getElementById("barcode-reader");
+      if (!container) return;
+
       const scanner = new Html5QrcodeScanner(
         "barcode-reader",
-        { 
-          fps: 10, 
+        {
+          fps: 10,
           qrbox: { width: 250, height: 150 },
           rememberLastUsedCamera: true,
-          aspectRatio: 1.777778
+          aspectRatio: 1.777778,
         },
-        /* verbose= */ false
+        false
       );
 
       scanner.render(
         (decodedText) => {
-          onScan(decodedText);
+          onScanRef.current(decodedText);
         },
-        (error) => {
+        () => {
           // Silent errors during scan are normal
         }
       );
 
       scannerRef.current = scanner;
-    }
+    }, 100);
 
     return () => {
+      clearTimeout(timeoutId);
       if (scannerRef.current) {
-        scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
+        scannerRef.current.clear().catch((err) => console.error("Failed to clear scanner", err));
         scannerRef.current = null;
       }
     };
-  }, [isScanning, onScan]);
+  }, [isScanning]);
 
   const toggleScanner = () => {
     setIsScanning(!isScanning);
@@ -54,8 +69,8 @@ export function BarcodeScanner({ onScan, autoStart = false }: BarcodeScannerProp
   return (
     <div className="space-y-4">
       <div className="flex justify-center">
-        <Button 
-          variant={isScanning ? "destructive" : "default"} 
+        <Button
+          variant={isScanning ? "destructive" : "default"}
           onClick={toggleScanner}
           className="gap-2"
         >
@@ -72,11 +87,11 @@ export function BarcodeScanner({ onScan, autoStart = false }: BarcodeScannerProp
           )}
         </Button>
       </div>
-      
-      <div 
-        id="barcode-reader" 
-        className={`mx-auto overflow-hidden rounded-lg border bg-black/5 ${isScanning ? 'block' : 'hidden'}`}
-        style={{ maxWidth: '500px' }}
+
+      <div
+        id="barcode-reader"
+        className={`mx-auto overflow-hidden rounded-lg border bg-black/5 ${isScanning ? "block" : "hidden"}`}
+        style={{ maxWidth: "500px" }}
       ></div>
 
       {!isScanning && (
