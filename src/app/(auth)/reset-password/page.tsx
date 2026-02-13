@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
-import { Lock, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
+import { Lock, CheckCircle2, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -21,7 +21,7 @@ const formSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +96,6 @@ export default function ResetPasswordPage() {
         <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
         Volver al login
       </Link>
-
       <div className="bg-card p-8 rounded-lg border shadow-sm text-center mt-8">
         <div className="mb-8">
           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -128,5 +127,17 @@ export default function ResetPasswordPage() {
         </Form>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="container max-w-md py-20 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
