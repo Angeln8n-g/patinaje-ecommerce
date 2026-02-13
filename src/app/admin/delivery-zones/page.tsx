@@ -28,19 +28,32 @@ const DeliveryZoneEditor = dynamic(
   }
 );
 
+const DeliveryPricingConfig = dynamic(
+  () => import("@/components/admin/DeliveryPricingConfig"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex justify-center p-10">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    ),
+  }
+);
+
 export default function DeliveryZonesPage() {
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Zonas de Entrega</h1>
         <p className="text-muted-foreground">
-          Configura la ubicación de la tienda y define las zonas geográficas de
-          cobertura para envíos.
+          Configura la ubicación de la tienda, define las zonas geográficas de
+          cobertura para envíos, y configura la tarificación basada en distancia.
         </p>
       </div>
 
       <StoreLocationConfig />
       <DeliveryZoneEditor />
+      <DeliveryPricingConfig />
     </div>
   );
 }

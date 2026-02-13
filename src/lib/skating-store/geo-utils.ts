@@ -134,3 +134,101 @@ export function validateCoordinates(
   }
   return { valid: true };
 }
+
+// ─── Shipping Configuration Validation ──────────────────────────────────────
+
+import type { ShippingConfig, ShippingCostResult } from "@/types/skating-store";
+
+/**
+ * Validates that a shipping configuration has valid values.
+ *
+ * @param config - The shipping configuration to validate
+ * @returns An object with `valid: true` on success, or `valid: false` and an
+ *          `error` message describing the problem.
+ */
+export function validateShippingConfig(
+  config: ShippingConfig
+): { valid: true } | { valid: false; error: string } {
+  if (config.base_radius_km < 0) {
+    return { valid: false, error: "El radio base no puede ser negativo" };
+  }
+  if (config.base_rate < 0) {
+    return { valid: false, error: "La tarifa base no puede ser negativa" };
+  }
+  if (config.cost_per_extra_km < 0) {
+    return { valid: false, error: "El costo por km adicional no puede ser negativo" };
+  }
+  if (config.max_distance_km < 0) {
+    return { valid: false, error: "La distancia máxima no puede ser negativa" };
+  }
+  if (config.max_distance_km <= config.base_radius_km) {
+    return { valid: false, error: "La distancia máxima debe ser mayor al radio base" };
+  }
+  return { valid: true };
+}
+
+// ─── Shipping Cost Computation ──────────────────────────────────────────────
+
+/**
+ * Computes the shipping cost based on distance and configuration.
+ *
+ * Classifies the delivery zone based on distance vs base radius vs max distance,
+ * and calculates the total cost accordingly.
+ *
+ * @param distanceKm - Distance from store to customer in kilometers (must be >= 0)
+ * @param config - Shipping configuration with pricing parameters
+ * @returns ShippingCostResult with zone classification and cost breakdown
+ */
+export function computeShippingCost(
+  distanceKm: number,
+  config: ShippingConfig
+): ShippingCostResult {
+  const { base_radius_km, base_rate, cost_per_extra_km, max_distance_km, out_of_zone_enabled } = config;
+
+  // Within base radius: flat rate
+  if (distanceKm <= base_radius_km) {
+    return {
+      zone_type: "within_zone",
+      distance_km: distanceKm,
+      base_radius_km,
+      base_rate,
+      extra_km: 0,
+      extra_charge: 0,
+      total_cost: base_rate,
+      max_distance_km,
+      out_of_zone_enabled,
+    };
+  }
+
+  // Beyond max distance: out of range
+  if (distanceKm > max_distance_km) {
+    const extraKm = Math.round((distanceKm - base_radius_km) * 100) / 100;
+    return {
+      zone_type: "out_of_range",
+      distance_km: distanceKm,
+      base_radius_km,
+      base_rate,
+      extra_km,
+      extra_charge: 0,
+      total_cost: 0,
+      max_distance_km,
+      out_of_zone_enabled,
+    };
+  }
+
+  // Between base radius and max distance: extra charge applies
+  const extraKm = Math.round((distanceKm - base_radius_km) * 100) / 100;
+  const extraCharge = extraKm * cost_per_extra_km;
+
+  return {
+    zone_type: "out_of_zone",
+    distance_km: distanceKm,
+    base_radius_km,
+    base_rate,
+    extra_km,
+    extra_charge,
+    total_cost: base_rate + extraCharge,
+    max_distance_km,
+    out_of_zone_enabled,
+  };
+}

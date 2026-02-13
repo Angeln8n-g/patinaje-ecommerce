@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
+  password_hash TEXT,
   role TEXT DEFAULT 'USER' CHECK (role IN ('USER', 'ADMIN', 'DELIVERY', 'SELLER')),
   first_name TEXT,
   last_name TEXT,
@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   address_postal_code TEXT,
   address_country TEXT,
   email_confirmed BOOLEAN DEFAULT FALSE,
+  auth_provider TEXT DEFAULT 'email',
+  auth_provider_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -321,3 +323,18 @@ CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_movements(product_
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON skating_notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_product ON skating_product_reviews(product_id);
+
+-- ==========================================
+-- password_reset_tokens
+-- ==========================================
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id);

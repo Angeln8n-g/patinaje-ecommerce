@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,13 +8,15 @@ import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ShippingInfo } from "@/types/skating-store";
+import { ShippingInfo, ShippingCostResult } from "@/types/skating-store";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button as UIButton } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { CreditCard, Banknote, Loader2 } from "lucide-react";
 import type { DeliveryLocationResult } from "./DeliveryLocationPicker";
+import { ShippingBreakdown } from "./ShippingBreakdown";
+import { calculateShippingCost } from "@/lib/skating-store/shipping-actions";
 
 // Dynamically import the map component with SSR disabled (Leaflet requires browser APIs)
 const DeliveryLocationPicker = dynamic(
@@ -51,6 +53,11 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
   // Delivery location state from map picker
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocationResult | null>(null);
 
+  // Shipping cost calculation state
+  const [shippingCost, setShippingCost] = useState<ShippingCostResult | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -63,15 +70,52 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
     },
   });
 
+  // Calculate shipping cost when delivery location changes
+  useEffect(() => {
+    async function calculate() {
+      if (deliveryLocation && deliveryLocation.lat && deliveryLocation.lng) {
+        setShippingLoading(true);
+        setShippingError(null);
+        try {
+          const result = await calculateShippingCost(deliveryLocation.lat, deliveryLocation.lng);
+          if (result.success) {
+            setShippingCost(result.data);
+            setShippingError(null);
+          } else {
+            setShippingCost(null);
+            setShippingError(result.error);
+          }
+        } catch (err) {
+          setShippingCost(null);
+          setShippingError("Error al calcular el costo de envío");
+          console.error("Shipping cost calculation error:", err);
+        } finally {
+          setShippingLoading(false);
+        }
+      } else {
+        setShippingCost(null);
+        setShippingError(null);
+      }
+    }
+    calculate();
+  }, [deliveryLocation]);
+
   const handleLocationChange = useCallback((result: DeliveryLocationResult | null) => {
     setDeliveryLocation(result);
   }, []);
 
   // Determine if the submit button should be blocked:
-  // - If a location was selected but it's outside all zones, block submit
+  // - If shipping cost result indicates out_of_range, block submit
+  // - If shipping cost result indicates out_of_zone and out_of_zone_enabled is false, block submit
   // - If no location was selected yet (and the map is shown), we don't block
   //   because the map might not render (graceful degradation when no zones exist)
   const isOutsideZone = deliveryLocation !== null && !deliveryLocation.inZone;
+  
+  // Check if shipping cost indicates blocking conditions
+  const isShippingBlocked = shippingCost !== null && (
+    shippingCost.zone_type === "out_of_range" ||
+    (shippingCost.zone_type === "out_of_zone" && !shippingCost.out_of_zone_enabled)
+  );
 
   const handleFormSubmit = async (data: z.infer<typeof formSchema>) => {
     // Include delivery coordinates in the shipping info if available
@@ -172,6 +216,34 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
           />
         </div>
 
+        {/* Shipping Cost Breakdown */}
+        {shippingCost && (
+          <div className="pt-4 border-t">
+            <ShippingBreakdown result={shippingCost} config={{
+              base_radius_km: shippingCost.base_radius_km,
+              base_rate: shippingCost.base_rate,
+              cost_per_extra_km: 0, // Not available in result, using 0 as placeholder
+              max_distance_km: shippingCost.max_distance_km,
+              out_of_zone_enabled: shippingCost.out_of_zone_enabled,
+            }} />
+          </div>
+        )}
+        {shippingError && !shippingCost && (
+          <div className="pt-4 border-t">
+            <Alert variant="destructive">
+              <AlertDescription>{shippingError}</AlertDescription>
+            </Alert>
+          </div>
+        )}
+        {shippingLoading && (
+          <div className="pt-4 border-t">
+            <div className="flex items-center justify-center p-4 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Calculando costo de envío...
+            </div>
+          </div>
+        )}
+
         <div className="pt-4 border-t">
           <h3 className="text-lg font-semibold mb-4">Método de Pago</h3>
           <FormField
@@ -233,7 +305,7 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
             type="submit"
             className="w-full mt-6"
             size="lg"
-            disabled={isLoading || isOutsideZone}
+            disabled={isLoading || isOutsideZone || isShippingBlocked || shippingLoading}
           >
             {isLoading ? "Procesando..." : "Confirmar Pedido"}
           </Button>

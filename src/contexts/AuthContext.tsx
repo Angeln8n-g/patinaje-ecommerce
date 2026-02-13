@@ -27,6 +27,7 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<AuthUser>;
   signUp: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: (credential: string) => Promise<AuthUser>;
   signOut: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -63,15 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const handleAuthResponse = (data: { user: AuthUser; token: string }) => {
+    setToken(data.token);
+    document.cookie = `skating_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    setUser(data.user);
+  };
+
   const signIn = async (email: string, password: string): Promise<AuthUser> => {
     const data = await apiClient<{ user: AuthUser; token: string }>("/api/auth/login", {
       method: "POST",
       body: { email, password },
     });
-    setToken(data.token);
-    // Also set as cookie for server actions
-    document.cookie = `skating_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-    setUser(data.user);
+    handleAuthResponse(data);
     return data.user;
   };
 
@@ -80,9 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       body: { email, password },
     });
-    setToken(data.token);
-    document.cookie = `skating_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-    setUser(data.user);
+    handleAuthResponse(data);
+  };
+
+  const signInWithGoogle = async (credential: string): Promise<AuthUser> => {
+    const data = await apiClient<{ user: AuthUser; token: string }>("/api/auth/google", {
+      method: "POST",
+      body: { credential },
+    });
+    handleAuthResponse(data);
+    return data.user;
   };
 
   const signOut = () => {
@@ -96,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, isAdmin, isDelivery, isSeller, isLoading, signIn, signUp, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, role, isAdmin, isDelivery, isSeller, isLoading, signIn, signUp, signInWithGoogle, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

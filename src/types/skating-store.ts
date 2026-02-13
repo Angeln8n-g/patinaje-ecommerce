@@ -175,6 +175,28 @@ export interface StoreLocation {
   address: string;
 }
 
+export interface ShippingConfig {
+  base_radius_km: number;
+  base_rate: number;
+  cost_per_extra_km: number;
+  max_distance_km: number;
+  out_of_zone_enabled: boolean;
+}
+
+export type ShippingZoneType = "within_zone" | "out_of_zone" | "out_of_range";
+
+export interface ShippingCostResult {
+  zone_type: ShippingZoneType;
+  distance_km: number;
+  base_radius_km: number;
+  base_rate: number;
+  extra_km: number;
+  extra_charge: number;
+  total_cost: number;
+  max_distance_km: number;
+  out_of_zone_enabled: boolean;
+}
+
 
 export interface PosSession {
   id: string;

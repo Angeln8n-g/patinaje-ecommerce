@@ -28,7 +28,7 @@ export function CartItem({ item, editable = true }: CartItemProps) {
           src={product.images[0] || "https://placehold.co/600x600/png?text=Skate"}
           alt={product.name}
           fill
-          className="object-contain mix-blend-multiply"
+          className="object-contain"
           sizes="96px"
         />
       </div>

@@ -7,12 +7,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiClient } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { LogIn, Mail, Lock, ArrowLeft, CheckCircle2, AlertCircle, ExternalLink, UserPlus } from "lucide-react";
+import { LogIn, Mail, Lock, ArrowLeft, CheckCircle2, AlertCircle, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -38,10 +40,7 @@ export default function LoginPage() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -49,18 +48,12 @@ export default function LoginPage() {
     setShouldShake(false);
     try {
       const user = await signIn(values.email, values.password);
-
       toast.success("¡Bienvenido de nuevo!");
 
-      if (user.role === "ADMIN") {
-        router.push("/admin");
-      } else if (user.role === "SELLER") {
-        router.push("/seller");
-      } else if (user.role === "DELIVERY") {
-        router.push("/delivery");
-      } else {
-        router.push("/skating-store");
-      }
+      if (user.role === "ADMIN") router.push("/admin");
+      else if (user.role === "SELLER") router.push("/seller");
+      else if (user.role === "DELIVERY") router.push("/delivery");
+      else router.push("/skating-store");
     } catch (error: any) {
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 500);
@@ -72,7 +65,7 @@ export default function LoginPage() {
 
   const handleForgotPassword = async () => {
     const email = form.getValues("email")?.trim();
-    
+
     if (!email) {
       toast.error("Por favor, ingresa tu email en el campo correspondiente");
       form.setFocus("email");
@@ -86,7 +79,18 @@ export default function LoginPage() {
       return;
     }
 
-    toast.info("Funcionalidad de recuperación de contraseña próximamente");
+    setIsResetting(true);
+    try {
+      await apiClient("/api/auth/forgot-password", {
+        method: "POST",
+        body: { email },
+      });
+      setShowResetSuccess(true);
+    } catch (error: any) {
+      toast.error(error.message || "Error al enviar correo de recuperación");
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -110,53 +114,42 @@ export default function LoginPage() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="tu@email.com" className="pl-10" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Contraseña</FormLabel>
-                    <button
-                      type="button"
-                      onClick={handleForgotPassword}
-                      disabled={isResetting}
-                      className="text-xs text-primary hover:underline font-bold disabled:opacity-50"
-                    >
-                      {isResetting ? "Enviando..." : "¿Olvidaste tu contraseña?"}
-                    </button>
+            <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="tu@email.com" className="pl-10" {...field} />
                   </div>
-                  <FormControl>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input type="password" placeholder="******" className="pl-10" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="password" render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Contraseña</FormLabel>
+                  <button type="button" onClick={handleForgotPassword} disabled={isResetting} className="text-xs text-primary hover:underline font-bold disabled:opacity-50">
+                    {isResetting ? "Enviando..." : "¿Olvidaste tu contraseña?"}
+                  </button>
+                </div>
+                <FormControl>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input type="password" placeholder="******" className="pl-10" {...field} />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <Button type="submit" className="w-full font-black uppercase tracking-widest h-12 rounded-full" disabled={isLoading}>
               {isLoading ? "Cargando..." : "Entrar"}
             </Button>
           </form>
         </Form>
+
+        <GoogleSignInButton />
 
         <div className="mt-6 text-center text-sm">
           <p className="text-muted-foreground">
@@ -176,15 +169,11 @@ export default function LoginPage() {
             </div>
             <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Correo Enviado</DialogTitle>
             <DialogDescription className="text-base pt-2 text-center">
-              Hemos enviado un enlace de recuperación a <strong>{form.getValues("email")}</strong>. 
-              Por favor, revisa tu bandeja de entrada y sigue las instrucciones.
+              Si el correo <strong>{form.getValues("email")}</strong> está registrado, recibirás un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-6">
-            <Button 
-              onClick={() => setShowResetSuccess(false)}
-              className="w-full font-black uppercase tracking-widest h-12 rounded-full"
-            >
+            <Button onClick={() => setShowResetSuccess(false)} className="w-full font-black uppercase tracking-widest h-12 rounded-full">
               Entendido
             </Button>
           </div>
@@ -199,22 +188,14 @@ export default function LoginPage() {
             </div>
             <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">No registrado</DialogTitle>
             <DialogDescription className="text-base pt-2 text-center">
-              Parece que el correo <strong>{form.getValues("email")}</strong> no está registrado en nuestra base de datos.
+              Parece que el correo <strong>{form.getValues("email")}</strong> no está registrado.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-6 flex flex-col gap-3">
             <Link href="/register" className="w-full">
-              <Button className="w-full font-black uppercase tracking-widest h-12 rounded-full">
-                Crear una cuenta
-              </Button>
+              <Button className="w-full font-black uppercase tracking-widest h-12 rounded-full">Crear una cuenta</Button>
             </Link>
-            <Button 
-              variant="ghost"
-              onClick={() => setShowNotRegistered(false)}
-              className="w-full font-bold uppercase tracking-widest h-12 rounded-full"
-            >
-              Cerrar
-            </Button>
+            <Button variant="ghost" onClick={() => setShowNotRegistered(false)} className="w-full font-bold uppercase tracking-widest h-12 rounded-full">Cerrar</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -227,28 +208,11 @@ export default function LoginPage() {
             </div>
             <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Confirma tu email</DialogTitle>
             <DialogDescription className="text-base pt-2 text-center">
-              Debes confirmar tu registro antes de poder iniciar sesión. Revisa tu correo y haz clic en el enlace de verificación.
+              Debes confirmar tu registro antes de poder iniciar sesión.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-6 flex flex-col gap-3">
-            <a 
-              href="https://mail.google.com/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="w-full"
-            >
-              <Button className="w-full font-black uppercase tracking-widest h-12 rounded-full flex items-center justify-center gap-2 bg-[#EA4335] hover:bg-[#EA4335]/90">
-                Ir a Gmail
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </a>
-            <Button 
-              variant="ghost"
-              onClick={() => setShowEmailNotConfirmed(false)}
-              className="w-full font-bold uppercase tracking-widest h-12 rounded-full"
-            >
-              Cerrar
-            </Button>
+          <div className="mt-6">
+            <Button variant="ghost" onClick={() => setShowEmailNotConfirmed(false)} className="w-full font-bold uppercase tracking-widest h-12 rounded-full">Cerrar</Button>
           </div>
         </DialogContent>
       </Dialog>
