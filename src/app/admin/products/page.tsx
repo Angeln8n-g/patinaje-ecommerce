@@ -12,6 +12,7 @@ import {
 import { getProductsServer } from "@/lib/skating-store/product-queries";
 import { Badge } from "@/components/ui/badge";
 import { ProductQRPrint } from "@/components/admin/ProductQRPrint";
+import { BulkProductUpload } from "@/components/admin/BulkProductUpload";
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,7 @@ export default async function AdminProductsPage() {
         <h1 className="text-3xl font-bold">Productos</h1>
         <div className="flex items-center gap-2">
           <ProductQRPrint products={products} />
+          <BulkProductUpload />
           <Link href="/admin/products/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />

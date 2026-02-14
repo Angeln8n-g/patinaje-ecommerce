@@ -193,3 +193,58 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData) {
     console.error("Error sending admin email:", error.message);
   }
 }
+
+interface DeliveryAlertData {
+  deliveryEmail: string;
+  deliveryName: string;
+  subject: string;
+  message: string;
+  orderId?: string;
+}
+
+export async function sendDeliveryAlert({ deliveryEmail, deliveryName, subject, message, orderId }: DeliveryAlertData) {
+  if (!resend || !deliveryEmail) {
+    console.log(`[Delivery Alert Simulated] To: ${deliveryEmail} | Subject: ${subject}`);
+    return { success: true };
+  }
+
+  try {
+    const deliveryUrl = `${APP_URL}/delivery`;
+    const { error } = await resend.emails.send({
+      from: "RD Patina <noreply@hunykho.com>",
+      to: deliveryEmail,
+      subject: `🚚 ${subject}`,
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+          <div style="background:#000;padding:24px 30px;text-align:center;">
+            <h1 style="color:#D7F000;margin:0;font-size:20px;text-transform:uppercase;letter-spacing:2px;">RD PATINA</h1>
+            <p style="color:#999;margin:4px 0 0;font-size:12px;">Notificación para Repartidor</p>
+          </div>
+          <div style="padding:24px 30px;">
+            <h2 style="margin:0 0 12px;font-size:18px;">${subject}</h2>
+            <p style="color:#333;font-size:15px;line-height:1.6;">Hola ${deliveryName},</p>
+            <p style="color:#333;font-size:15px;line-height:1.6;">${message}</p>
+            ${orderId ? `<p style="color:#666;font-size:13px;margin-top:16px;">Pedido: #${orderId.slice(0, 8).toUpperCase()}</p>` : ""}
+            <div style="margin:24px 0;text-align:center;">
+              <a href="${deliveryUrl}" style="background:#D7F000;color:#000;padding:14px 28px;border-radius:50px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:13px;display:inline-block;">
+                Abrir Panel de Entregas
+              </a>
+            </div>
+          </div>
+          <div style="background:#f9fafb;padding:14px 30px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:11px;color:#999;">&copy; ${new Date().getFullYear()} RD Patina</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error("Delivery alert error:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending delivery alert:", error.message);
+    return { success: false, error: error.message };
+  }
+}

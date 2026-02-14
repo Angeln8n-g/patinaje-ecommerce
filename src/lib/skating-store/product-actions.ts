@@ -31,6 +31,10 @@ export async function createProduct(data: Omit<Product, "id" | "created_at" | "u
   return authServerFetch("/api/products", { method: "POST", body: data });
 }
 
+export async function bulkCreateProducts(products: Record<string, any>[]) {
+  return authServerFetch("/api/products/bulk", { method: "POST", body: { products } });
+}
+
 export async function updateProduct(id: string, data: Partial<Product>) {
   return authServerFetch(`/api/products/${id}`, { method: "PUT", body: data });
 }

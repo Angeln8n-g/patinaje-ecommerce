@@ -113,6 +113,68 @@ router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
   }
 });
 
+// POST /api/products/bulk — admin: bulk create products
+router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { products } = req.body;
+    if (!Array.isArray(products) || products.length === 0) {
+      res.status(400).json({ error: "Debe enviar un array de productos" });
+      return;
+    }
+    if (products.length > 500) {
+      res.status(400).json({ error: "Máximo 500 productos por carga" });
+      return;
+    }
+
+    const results: { success: any[]; errors: { row: number; name: string; error: string }[] } = { success: [], errors: [] };
+
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      try {
+        if (!p.name || !p.price) {
+          results.errors.push({ row: i + 1, name: p.name || "Sin nombre", error: "Nombre y precio son obligatorios" });
+          continue;
+        }
+        const result = await query(
+          `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, status, subcategory, unit_type, supplier, purchase_price)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           RETURNING *`,
+          [
+            p.name,
+            p.description || "",
+            parseFloat(p.price) || 0,
+            p.category || "",
+            p.images || [],
+            parseInt(p.stock) || 0,
+            p.featured === true || p.featured === "true" || p.featured === "si" || p.featured === "sí",
+            p.barcode || null,
+            p.variant_type || "none",
+            p.variant_options || [],
+            p.status || "active",
+            p.subcategory || null,
+            p.unit_type || null,
+            p.supplier || null,
+            p.purchase_price ? parseFloat(p.purchase_price) : null,
+          ]
+        );
+        results.success.push(parseProduct(result.rows[0]));
+      } catch (err: any) {
+        results.errors.push({ row: i + 1, name: p.name || "Sin nombre", error: err.message || "Error desconocido" });
+      }
+    }
+
+    res.status(201).json({
+      total: products.length,
+      created: results.success.length,
+      failed: results.errors.length,
+      errors: results.errors,
+    });
+  } catch (err) {
+    console.error("Bulk create error:", err);
+    res.status(500).json({ error: "Error en carga masiva" });
+  }
+});
+
 // PUT /api/products/:id — admin or seller
 router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res) => {
   try {

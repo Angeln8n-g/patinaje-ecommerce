@@ -149,14 +149,23 @@ router.get("/men", requireAuth, requireRole("ADMIN"), async (_req, res) => {
 // GET /api/delivery/men/stats — admin: delivery men with full stats
 router.get("/men/stats", requireAuth, requireRole("ADMIN"), async (_req, res) => {
   try {
-    const profiles = await query("SELECT id, email, first_name, last_name, created_at FROM profiles WHERE role = 'DELIVERY'");
+    const profiles = await query("SELECT id, email, first_name, last_name, phone, address_street, address_city, created_at FROM profiles WHERE role = 'DELIVERY'");
     const delivered = await query("SELECT delivery_man_id, COUNT(*) as cnt FROM shipments WHERE status = 'ENTREGADO' GROUP BY delivery_man_id");
     const active = await query("SELECT delivery_man_id, COUNT(*) as cnt FROM shipments WHERE status != 'ENTREGADO' GROUP BY delivery_man_id");
     const ratings = await query("SELECT delivery_man_id, AVG(rating) as avg, COUNT(*) as cnt FROM delivery_ratings GROUP BY delivery_man_id");
+    const locations = await query("SELECT delivery_man_id, lat, lng, updated_at FROM delivery_locations");
+    // Total sales per delivery man (sum of order totals for delivered shipments)
+    const sales = await query(
+      `SELECT s.delivery_man_id, COALESCE(SUM(o.total), 0) as total_sales
+       FROM shipments s JOIN skating_orders o ON o.id = s.order_id
+       WHERE s.status = 'ENTREGADO' GROUP BY s.delivery_man_id`
+    );
 
     const deliveredMap = new Map(delivered.rows.map((r: any) => [r.delivery_man_id, parseInt(r.cnt)]));
     const activeMap = new Map(active.rows.map((r: any) => [r.delivery_man_id, parseInt(r.cnt)]));
     const ratingsMap = new Map(ratings.rows.map((r: any) => [r.delivery_man_id, { avg: parseFloat(r.avg), cnt: parseInt(r.cnt) }]));
+    const locationsMap = new Map(locations.rows.map((r: any) => [r.delivery_man_id, { lat: parseFloat(r.lat), lng: parseFloat(r.lng), updated_at: r.updated_at }]));
+    const salesMap = new Map(sales.rows.map((r: any) => [r.delivery_man_id, parseFloat(r.total_sales)]));
 
     const stats = profiles.rows.map((p: any) => ({
       ...p,
@@ -164,6 +173,8 @@ router.get("/men/stats", requireAuth, requireRole("ADMIN"), async (_req, res) =>
       deliveredCount: deliveredMap.get(p.id) || 0,
       ratingCount: ratingsMap.get(p.id)?.cnt || 0,
       avgRating: ratingsMap.get(p.id)?.avg || 0,
+      totalSales: salesMap.get(p.id) || 0,
+      lastLocation: locationsMap.get(p.id) || null,
     }));
 
     res.json(stats.sort((a: any, b: any) => b.avgRating - a.avgRating));
