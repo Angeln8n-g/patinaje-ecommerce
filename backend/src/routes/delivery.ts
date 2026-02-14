@@ -311,6 +311,16 @@ router.get("/ratings/stats/:deliveryManId", async (req, res) => {
 router.post("/invoices", requireAuth, async (req, res) => {
   try {
     const { order_id, customer_email, total } = req.body;
+
+    // Check if a final invoice already exists for this order
+    const existing = await query(
+      "SELECT invoice_number FROM skating_invoices WHERE order_id = $1 AND invoice_number LIKE 'FAC-%' LIMIT 1",
+      [order_id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(200).json({ success: true, invoiceNumber: existing.rows[0].invoice_number, alreadyExists: true });
+    }
+
     const date = new Date();
     const invoiceNumber = "FAC-" + date.getFullYear() + "-" + order_id.substring(0, 4).toUpperCase() + "-" + String(Math.floor(Math.random() * 1000)).padStart(3, "0");
     const result = await query(

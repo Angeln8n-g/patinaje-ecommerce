@@ -155,14 +155,20 @@ export async function sendProformaInvoice(data: InvoiceData) {
 }
 
 /** Generate and send the final invoice when payment is confirmed. */
-export async function generateAndSendInvoice(data: InvoiceData) {
+export async function generateAndSendInvoice(data: InvoiceData, { force = false }: { force?: boolean } = {}) {
   try {
-    // Create invoice record in DB
+    // Create invoice record in DB (backend returns existing if already created)
     const result = await apiFetch("/api/delivery/invoices", {
       method: "POST",
       body: { order_id: data.orderId, customer_email: data.customerEmail, total: data.total },
     });
     const invoiceNumber = result.invoiceNumber;
+
+    // If invoice already existed and this is not a forced resend, skip email
+    if (result.alreadyExists && !force) {
+      console.log(`Invoice ${invoiceNumber} already sent for order ${data.orderId}, skipping duplicate email.`);
+      return { success: true, invoiceNumber, alreadySent: true };
+    }
 
     if (!resend || !data.customerEmail) {
       console.log(`[Invoice Simulated] To: ${data.customerEmail} | Invoice: ${invoiceNumber}`);

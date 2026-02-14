@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +29,14 @@ const formSchema = z.object({
 });
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [showResetSuccess, setShowResetSuccess] = useState(false);
@@ -36,6 +44,8 @@ export default function LoginPage() {
   const [showEmailNotConfirmed, setShowEmailNotConfirmed] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
   const { signIn } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -50,7 +60,8 @@ export default function LoginPage() {
       const user = await signIn(values.email, values.password);
       toast.success("¡Bienvenido de nuevo!");
 
-      if (user.role === "ADMIN") router.push("/admin");
+      if (redirectTo) router.push(redirectTo);
+      else if (user.role === "ADMIN") router.push("/admin");
       else if (user.role === "SELLER") router.push("/seller");
       else if (user.role === "DELIVERY") router.push("/delivery");
       else router.push("/skating-store");

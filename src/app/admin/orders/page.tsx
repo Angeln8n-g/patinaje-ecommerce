@@ -156,7 +156,7 @@ export default function AdminOrdersPage() {
         shippingCost: 0,
         total: order.total,
         paymentMethod: order.payment_method || "card",
-      });
+      }, { force: true });
       toast.success("Factura generada y enviada correctamente");
     } catch (error) {
       toast.error("Error al generar la factura");

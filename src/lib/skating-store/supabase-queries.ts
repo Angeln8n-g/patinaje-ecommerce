@@ -105,10 +105,17 @@ export async function createOrder(
 
 export async function getOrderById(id: string) {
   try {
-    const orders = await authFetch<any[]>("/api/orders/my");
-    const order = orders.find((o) => o.id === id);
+    // Try direct fetch first (works for authenticated users)
+    const order = await authFetch<any>(`/api/orders/${id}`);
     return order ? mapDbOrderToOrder(order) : null;
-  } catch { return null; }
+  } catch {
+    // Fallback: search in user's orders list
+    try {
+      const orders = await authFetch<any[]>("/api/orders/my");
+      const order = orders.find((o) => o.id === id);
+      return order ? mapDbOrderToOrder(order) : null;
+    } catch { return null; }
+  }
 }
 
 export async function confirmCashPayment(orderId: string, qrToken: string) {

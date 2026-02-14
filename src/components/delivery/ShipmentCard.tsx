@@ -143,7 +143,7 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
         shippingCost: 0,
         total: order.total,
         paymentMethod: order.payment_method || "card",
-      });
+      }, { force: true });
       toast.success("Factura enviada correctamente al cliente");
     } catch (error) {
       toast.error("Error al enviar la factura");

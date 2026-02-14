@@ -1,184 +1,371 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getBanners, createBanner, deleteBanner, updateBanner } from "@/lib/skating-store/content-actions";
-import { Banner } from "@/types/skating-store";
+import { getProducts, getCategories } from "@/lib/skating-store/supabase-queries";
+import { Banner, Product, Category } from "@/types/skating-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, Trash2, Plus, ExternalLink } from "lucide-react";
+import { Loader2, Trash2, Plus, ExternalLink, Pencil, Search, Image, Link2, Tag, Package, Globe } from "lucide-react";
 import { PromoTextManager } from "@/components/admin/PromoTextManager";
+
+type LinkType = "none" | "product" | "category" | "custom";
+
+interface BannerForm {
+  title: string;
+  description: string;
+  image_url: string;
+  link_url: string;
+  active: boolean;
+  display_order: number;
+}
+
+const EMPTY_FORM: BannerForm = {
+  title: "",
+  description: "",
+  image_url: "",
+  link_url: "",
+  active: true,
+  display_order: 0,
+};
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newBanner, setNewBanner] = useState<{
-    title: string;
-    description: string;
-    image_url: string;
-    link_url: string;
-    active: boolean;
-    display_order: number;
-  }>({ 
-    title: "", 
-    description: "",
-    image_url: "", 
-    link_url: "", 
-    active: true, 
-    display_order: 0 
-  });
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [form, setForm] = useState<BannerForm>(EMPTY_FORM);
+  const [linkType, setLinkType] = useState<LinkType>("none");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>("");
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return products.slice(0, 20);
+    const q = productSearch.toLowerCase();
+    return products.filter(p => p.name.toLowerCase().includes(q)).slice(0, 20);
+  }, [products, productSearch]);
 
   const loadData = async () => {
     try {
-      const data = await getBanners();
-      setBanners(data);
-    } catch (error) {
-      toast.error("Error al cargar banners");
+      const [bannersData, productsData, categoriesData] = await Promise.all([
+        getBanners(),
+        getProducts(),
+        getCategories(),
+      ]);
+      setBanners(bannersData);
+      setProducts(productsData);
+      setCategories(categoriesData);
+    } catch {
+      toast.error("Error al cargar datos");
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const handleCreate = async () => {
-    if (!newBanner.title || !newBanner.image_url) {
+  // Detect link type from URL when editing
+  const detectLinkType = (url: string): { type: LinkType; productId?: string; categorySlug?: string } => {
+    if (!url) return { type: "none" };
+    const productMatch = url.match(/\/producto\/([a-f0-9-]+)/);
+    if (productMatch) return { type: "product", productId: productMatch[1] };
+    const categoryMatch = url.match(/\/catalogo\?category=([^&]+)/);
+    if (categoryMatch) return { type: "category", categorySlug: categoryMatch[1] };
+    return { type: "custom" };
+  };
+
+  const updateLinkFromSelection = (type: LinkType, productId?: string, categorySlug?: string) => {
+    let link = "";
+    if (type === "product" && productId) {
+      link = `/skating-store/producto/${productId}`;
+      const product = products.find(p => p.id === productId);
+      // Auto-fill image from product if empty
+      if (product && !form.image_url && product.images?.[0]) {
+        setForm(prev => ({ ...prev, image_url: product.images[0] }));
+      }
+    } else if (type === "category" && categorySlug) {
+      link = `/skating-store/catalogo?category=${categorySlug}`;
+    }
+    setForm(prev => ({ ...prev, link_url: link }));
+  };
+
+  const handleProductSelect = (productId: string) => {
+    setSelectedProductId(productId);
+    updateLinkFromSelection("product", productId);
+  };
+
+  const handleCategorySelect = (slug: string) => {
+    setSelectedCategorySlug(slug);
+    updateLinkFromSelection("category", undefined, slug);
+  };
+
+  const handleLinkTypeChange = (type: LinkType) => {
+    setLinkType(type);
+    setSelectedProductId("");
+    setSelectedCategorySlug("");
+    setProductSearch("");
+    if (type === "none") setForm(prev => ({ ...prev, link_url: "" }));
+  };
+
+  const openCreate = () => {
+    setEditingBanner(null);
+    setForm(EMPTY_FORM);
+    setLinkType("none");
+    setSelectedProductId("");
+    setSelectedCategorySlug("");
+    setProductSearch("");
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (banner: Banner) => {
+    setEditingBanner(banner);
+    setForm({
+      title: banner.title,
+      description: banner.description || "",
+      image_url: banner.image_url,
+      link_url: banner.link_url || "",
+      active: banner.active,
+      display_order: banner.display_order,
+    });
+    const detected = detectLinkType(banner.link_url || "");
+    setLinkType(detected.type);
+    setSelectedProductId(detected.productId || "");
+    setSelectedCategorySlug(detected.categorySlug || "");
+    setProductSearch("");
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title || !form.image_url) {
       toast.error("Título e Imagen son obligatorios");
       return;
     }
-
     try {
-      await createBanner(newBanner);
-      toast.success("Banner creado");
-      setIsCreateOpen(false);
-      setNewBanner({ title: "", description: "", image_url: "", link_url: "", active: true, display_order: 0 });
+      if (editingBanner) {
+        await updateBanner(editingBanner.id, form);
+        toast.success("Banner actualizado");
+      } else {
+        await createBanner(form);
+        toast.success("Banner creado");
+      }
+      setIsDialogOpen(false);
       loadData();
-    } catch (error) {
-      toast.error("Error al crear banner");
+    } catch {
+      toast.error(editingBanner ? "Error al actualizar" : "Error al crear");
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de eliminar este banner?")) return;
-    
     try {
       await deleteBanner(id);
       toast.success("Banner eliminado");
       loadData();
-    } catch (error) {
-      toast.error("Error al eliminar banner");
-    }
+    } catch { toast.error("Error al eliminar"); }
   };
 
-  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+  const handleToggleActive = async (id: string, active: boolean) => {
     try {
-      await updateBanner(id, { active: !currentStatus });
+      await updateBanner(id, { active: !active });
       toast.success("Estado actualizado");
       loadData();
-    } catch (error) {
-      toast.error("Error al actualizar estado");
-    }
+    } catch { toast.error("Error al actualizar"); }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center p-10">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  if (isLoading) return <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Gestión de Banners</h1>
-      </div>
+      <h1 className="text-3xl font-bold">Gestión de Banners</h1>
 
       <Tabs defaultValue="carousel" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
           <TabsTrigger value="carousel">Carrusel Principal</TabsTrigger>
           <TabsTrigger value="promo">Banner de Envíos</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="carousel" className="space-y-6 mt-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Banners del Carrusel</h2>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Banner
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                {/* ... existing dialog content ... */}
-                <DialogHeader>
-                  <DialogTitle>Crear Banner</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Título</Label>
-                    <Input 
-                      value={newBanner.title} 
-                      onChange={(e) => setNewBanner(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Oferta de Verano"
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Banner
+            </Button>
+          </div>
+
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) setIsDialogOpen(false); }}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingBanner ? "Editar Banner" : "Crear Banner"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-5 py-2">
+                {/* Title */}
+                <div className="space-y-2">
+                  <Label>Título</Label>
+                  <Input
+                    value={form.title}
+                    onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Ej: Oferta de Verano"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label>Descripción <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                  <Input
+                    value={form.description}
+                    onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Ej: Descuentos de hasta 50%"
+                  />
+                </div>
+
+                {/* Image URL */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><Image className="h-4 w-4" /> URL de Imagen, GIF o Video</Label>
+                  <Input
+                    value={form.image_url}
+                    onChange={(e) => setForm(prev => ({ ...prev, image_url: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-muted-foreground">JPG, PNG, GIF, MP4, WebM</p>
+                  {form.image_url && (
+                    <img src={form.image_url} alt="Preview" className="h-28 w-full object-cover rounded border" />
+                  )}
+                </div>
+
+                {/* Link Type Selector */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2"><Link2 className="h-4 w-4" /> Enlace del Banner</Label>
+                  <Select value={linkType} onValueChange={(v) => handleLinkTypeChange(v as LinkType)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="¿A dónde lleva este banner?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="flex items-center gap-2">Sin enlace</span>
+                      </SelectItem>
+                      <SelectItem value="product">
+                        <span className="flex items-center gap-2"><Package className="h-4 w-4" /> A un Producto</span>
+                      </SelectItem>
+                      <SelectItem value="category">
+                        <span className="flex items-center gap-2"><Tag className="h-4 w-4" /> A una Categoría</span>
+                      </SelectItem>
+                      <SelectItem value="custom">
+                        <span className="flex items-center gap-2"><Globe className="h-4 w-4" /> URL Personalizada</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Product Selector */}
+                  {linkType === "product" && (
+                    <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          placeholder="Buscar producto..."
+                          className="pl-9"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {filteredProducts.map(product => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => handleProductSelect(product.id)}
+                            className={`w-full flex items-center gap-3 p-2 rounded-md text-left text-sm transition-colors hover:bg-accent ${selectedProductId === product.id ? "bg-primary/10 ring-1 ring-primary" : ""}`}
+                          >
+                            {product.images?.[0] ? (
+                              <img src={product.images[0]} alt="" className="h-10 w-10 rounded object-cover shrink-0" />
+                            ) : (
+                              <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
+                                <Package className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">{product.category} · RD${product.price.toLocaleString()}</p>
+                            </div>
+                          </button>
+                        ))}
+                        {filteredProducts.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">No se encontraron productos</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category Selector */}
+                  {linkType === "category" && (
+                    <Select value={selectedCategorySlug} onValueChange={handleCategorySelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar categoría..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.slug}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {/* Custom URL */}
+                  {linkType === "custom" && (
+                    <Input
+                      value={form.link_url}
+                      onChange={(e) => setForm(prev => ({ ...prev, link_url: e.target.value }))}
+                      placeholder="/skating-store/catalogo o https://..."
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Descripción (Opcional)</Label>
-                    <Input 
-                      value={newBanner.description} 
-                      onChange={(e) => setNewBanner(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Descuentos de hasta 50%"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>URL de Imagen, GIF o Video</Label>
-                    <Input 
-                      value={newBanner.image_url} 
-                      onChange={(e) => setNewBanner(prev => ({ ...prev, image_url: e.target.value }))}
-                      placeholder="https://... (JPG, PNG, GIF, MP4, WEBM)"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Soporta imágenes estáticas, GIFs animados y videos (MP4, WebM).
+                  )}
+
+                  {form.link_url && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Link2 className="h-3 w-3" /> {form.link_url}
                     </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Link de Destino (Opcional)</Label>
-                    <Input 
-                      value={newBanner.link_url} 
-                      onChange={(e) => setNewBanner(prev => ({ ...prev, link_url: e.target.value }))}
-                      placeholder="/skating-store/catalogo"
-                    />
-                  </div>
+                  )}
+                </div>
+
+                {/* Order & Active */}
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Orden</Label>
-                    <Input 
+                    <Input
                       type="number"
-                      value={newBanner.display_order} 
-                      onChange={(e) => setNewBanner(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
+                      value={form.display_order}
+                      onChange={(e) => setForm(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Activo</Label>
-                    <Switch 
-                      checked={newBanner.active} 
-                      onCheckedChange={(checked) => setNewBanner(prev => ({ ...prev, active: checked }))} 
-                    />
+                  <div className="space-y-2">
+                    <Label>Estado</Label>
+                    <div className="flex items-center gap-3 h-10">
+                      <Switch
+                        checked={form.active}
+                        onCheckedChange={(checked) => setForm(prev => ({ ...prev, active: checked }))}
+                      />
+                      <span className="text-sm">{form.active ? "Activo" : "Inactivo"}</span>
+                    </div>
                   </div>
-                  <Button onClick={handleCreate} className="w-full">Guardar</Button>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+
+                <Button onClick={handleSave} className="w-full">
+                  {editingBanner ? "Actualizar Banner" : "Crear Banner"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <div className="bg-card rounded-lg border">
             <Table>
@@ -197,11 +384,7 @@ export default function BannersPage() {
                   <TableRow key={banner.id}>
                     <TableCell>{banner.display_order}</TableCell>
                     <TableCell>
-                      <img 
-                        src={banner.image_url} 
-                        alt={banner.title} 
-                        className="h-10 w-20 object-cover rounded"
-                      />
+                      <img src={banner.image_url} alt={banner.title} className="h-10 w-20 object-cover rounded" />
                     </TableCell>
                     <TableCell className="font-medium">{banner.title}</TableCell>
                     <TableCell>
@@ -212,15 +395,17 @@ export default function BannersPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Switch 
-                        checked={banner.active} 
-                        onCheckedChange={() => handleToggleActive(banner.id, banner.active)} 
-                      />
+                      <Switch checked={banner.active} onCheckedChange={() => handleToggleActive(banner.id, banner.active)} />
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(banner.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(banner)}>
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(banner.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

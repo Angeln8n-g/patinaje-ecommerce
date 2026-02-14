@@ -7,16 +7,17 @@ import { Order, StoreLocation } from "@/types/skating-store";
 import { haversineDistance, calculateEstimatedTime, formatEstimatedTime } from "@/lib/skating-store/geo-utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, Truck, CheckCircle2, MapPin, Banknote, QrCode, Clock, Phone, Star, Timer, XCircle } from "lucide-react";
+import { Loader2, Package, Truck, CheckCircle2, MapPin, Banknote, QrCode, Clock, Phone, Star, Timer, XCircle, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { DeliveryRatingDialog } from "@/components/skating-store/rating/DeliveryRatingDialog";
 import { getOrderRating } from "@/lib/skating-store/rating-actions";
-import { authFetch } from "@/lib/api/client";
+import { authFetch, getToken } from "@/lib/api/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const STEPS = [
   { id: "pending", label: "Pendiente", icon: Clock },
@@ -27,9 +28,12 @@ const STEPS = [
 
 export default function OrderTrackingPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
+  const { user, isLoading: authLoading } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [etaText, setEtaText] = useState<string | null>(null);
@@ -99,7 +103,15 @@ export default function OrderTrackingPage() {
   useEffect(() => { calculateETA(); }, [calculateETA]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || authLoading) return;
+    
+    // If not authenticated, don't try to fetch — show login prompt
+    if (!user) {
+      setLoading(false);
+      setNotFound(true);
+      return;
+    }
+
     const loadInitial = async () => {
       await Promise.all([fetchOrder(), fetchShipmentInfo()]);
       setLoading(false);
@@ -108,9 +120,19 @@ export default function OrderTrackingPage() {
     // Poll every 10 seconds for updates (replaces Supabase realtime)
     const interval = setInterval(() => { fetchOrder(); fetchShipmentInfo(); calculateETA(); }, 10000);
     return () => clearInterval(interval);
-  }, [id, fetchOrder, fetchShipmentInfo, calculateETA]);
+  }, [id, user, authLoading, fetchOrder, fetchShipmentInfo, calculateETA]);
 
   if (loading) return <div className="flex h-[70vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  
+  if (!user && notFound) return (
+    <div className="container py-20 text-center">
+      <LogIn className="h-16 w-16 mx-auto mb-6 text-primary" />
+      <h2 className="text-2xl font-bold mb-4">Inicia sesión para ver tu pedido</h2>
+      <p className="text-muted-foreground mb-8">Necesitas estar conectado para acceder al seguimiento de tu pedido.</p>
+      <Link href={`/login?redirect=/skating-store/tracking/${id}`}><Button>Iniciar Sesión</Button></Link>
+    </div>
+  );
+
   if (!order) return (
     <div className="container py-20 text-center">
       <h2 className="text-2xl font-bold mb-4">No se encontró el pedido</h2>
