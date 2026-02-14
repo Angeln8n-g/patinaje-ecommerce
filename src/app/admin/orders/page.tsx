@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { getAllOrdersWithShipment, getAllDeliveryMen, assignShipment, getNearestDeliveryMen } from "@/lib/skating-store/delivery-actions";
 import { getStoreLocation } from "@/lib/skating-store/zone-actions";
 import { getSellers } from "@/lib/skating-store/user-actions";
@@ -12,9 +13,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Truck, FileText, Star, AlertTriangle, MapPin, UserCheck } from "lucide-react";
+import { Loader2, Truck, FileText, Star, AlertTriangle, MapPin, UserCheck, Eye, Map } from "lucide-react";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
+import { InvoicePreview } from "@/components/admin/InvoicePreview";
 import { formatCurrency } from "@/lib/utils";
+
+const OrdersMap = dynamic(() => import("@/components/admin/OrdersMap"), {
+  ssr: false,
+  loading: () => <div className="h-[500px] w-full flex items-center justify-center bg-muted rounded-lg border">Cargando mapa...</div>,
+});
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -37,6 +44,14 @@ export default function AdminOrdersPage() {
   const [sellerAssignOrderSellerId, setSellerAssignOrderSellerId] = useState<string | null>(null);
   const [selectedSellerId, setSelectedSellerId] = useState<string>("");
   const [confirmReassign, setConfirmReassign] = useState(false);
+
+  // Invoice preview state
+  const [previewOrder, setPreviewOrder] = useState<any>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+
+  // Map toggle
+  const [showMap, setShowMap] = useState(false);
 
   const loadData = async (silent = false) => {
     if (isRefreshing) return;
@@ -119,20 +134,40 @@ export default function AdminOrdersPage() {
   };
 
   const handleSendInvoice = async (order: any) => {
+    setSendingInvoice(true);
     try {
-      // Intentamos obtener el email del cliente
-      const customerEmail = order.customer_email || (order.user_id ? "cliente@example.com" : null); // Fallback si no hay email en la orden
+      const customerEmail = order.customer_email || order.shipping?.email;
       
       if (!customerEmail) {
         toast.error("No se encontró el email del cliente");
         return;
       }
 
-      await generateAndSendInvoice(order.id, customerEmail, order.total);
+      const shipping = order.shipping || {};
+      await generateAndSendInvoice({
+        orderId: order.id,
+        customerEmail,
+        customerName: shipping.fullName || order.customer_name || "Cliente",
+        address: shipping.address || order.customer_address || "",
+        city: shipping.city || order.customer_city || "",
+        phone: shipping.phone || order.customer_phone || "",
+        items: order.items || [],
+        subtotal: order.total,
+        shippingCost: 0,
+        total: order.total,
+        paymentMethod: order.payment_method || "card",
+      });
       toast.success("Factura generada y enviada correctamente");
     } catch (error) {
       toast.error("Error al generar la factura");
+    } finally {
+      setSendingInvoice(false);
     }
+  };
+
+  const handleOpenPreview = (order: any) => {
+    setPreviewOrder(order);
+    setPreviewOpen(true);
   };
 
   const handleOpenSellerAssign = (order: any) => {
@@ -177,8 +212,16 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Gestión de Pedidos</h1>
-        <Button onClick={() => loadData(false)} variant="outline">Actualizar</Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowMap(!showMap)} variant={showMap ? "default" : "outline"} className="gap-2">
+            <Map className="h-4 w-4" />
+            {showMap ? "Ocultar Mapa" : "Ver Mapa"}
+          </Button>
+          <Button onClick={() => loadData(false)} variant="outline">Actualizar</Button>
+        </div>
       </div>
+
+      {showMap && <OrdersMap orders={orders} />}
 
       <div className="bg-card rounded-lg border">
         <Table>
@@ -235,113 +278,121 @@ export default function AdminOrdersPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setSelectedOrder(order.id)}
-                        >
-                          {order.shipment ? "Reasignar" : "Asignar"}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Asignar Repartidor</DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4 space-y-4">
-                          {noLocationWarning && (
-                            <Alert variant="destructive">
-                              <AlertTriangle className="h-4 w-4" />
-                              <AlertTitle>Sin ubicación conocida</AlertTitle>
-                              <AlertDescription>
-                                No se puede determinar la cercanía de los repartidores. Ningún repartidor tiene ubicación conocida.
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                          {storeLocationMissing && (
-                            <Alert>
-                              <MapPin className="h-4 w-4" />
-                              <AlertTitle>Ubicación de tienda no configurada</AlertTitle>
-                              <AlertDescription>
-                                Configure la ubicación de la tienda en Zonas de Entrega para ver las distancias de los repartidores.
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Seleccionar Repartidor</label>
-                            {nearestDeliveryMen.length > 0 ? (
-                              <Select 
-                                onValueChange={setSelectedDeliveryMan} 
-                                value={selectedDeliveryMan}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecciona..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                {nearestDeliveryMen.map((dm) => (
-                                  <SelectItem key={dm.delivery_man_id} value={dm.delivery_man_id}>
-                                    <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
-                                      <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
-                                      <span className="text-xs text-muted-foreground font-medium">
-                                        — {dm.distance_km.toFixed(1)} km
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Select 
-                                onValueChange={setSelectedDeliveryMan} 
-                                value={selectedDeliveryMan}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecciona..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                {deliveryMen.map((dm) => (
-                                  <SelectItem key={dm.id} value={dm.id}>
-                                    <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
-                                      <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
-                                      {dm.avg_rating > 0 && (
-                                        <div className="flex items-center gap-1 text-yellow-500">
-                                          <Star className="w-3 h-3 fill-current" />
-                                          <span className="text-xs font-bold">{dm.avg_rating.toFixed(1)}</span>
-                                          <span className="text-xs text-muted-foreground">({dm.rating_count})</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                          <Button className="w-full" onClick={handleAssign} disabled={!selectedDeliveryMan}>
-                            Confirmar Asignación
+                    {order.status !== "delivered" && order.status !== "cancelled" ? (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedOrder(order.id)}
+                          >
+                            {order.shipment ? "Reasignar" : "Asignar"}
                           </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Asignar Repartidor</DialogTitle>
+                          </DialogHeader>
+                          <div className="py-4 space-y-4">
+                            {noLocationWarning && (
+                              <Alert variant="destructive">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Sin ubicación conocida</AlertTitle>
+                                <AlertDescription>
+                                  No se puede determinar la cercanía de los repartidores. Ningún repartidor tiene ubicación conocida.
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                            {storeLocationMissing && (
+                              <Alert>
+                                <MapPin className="h-4 w-4" />
+                                <AlertTitle>Ubicación de tienda no configurada</AlertTitle>
+                                <AlertDescription>
+                                  Configure la ubicación de la tienda en Zonas de Entrega para ver las distancias de los repartidores.
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Seleccionar Repartidor</label>
+                              {nearestDeliveryMen.length > 0 ? (
+                                <Select 
+                                  onValueChange={setSelectedDeliveryMan} 
+                                  value={selectedDeliveryMan}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                  {nearestDeliveryMen.map((dm) => (
+                                    <SelectItem key={dm.delivery_man_id} value={dm.delivery_man_id}>
+                                      <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
+                                        <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
+                                        <span className="text-xs text-muted-foreground font-medium">
+                                          — {dm.distance_km.toFixed(1)} km
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Select 
+                                  onValueChange={setSelectedDeliveryMan} 
+                                  value={selectedDeliveryMan}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                  {deliveryMen.map((dm) => (
+                                    <SelectItem key={dm.id} value={dm.id}>
+                                      <div className="flex items-center justify-between w-full min-w-[200px] gap-2">
+                                        <span>{dm.first_name ? `${dm.first_name} ${dm.last_name || ''}` : dm.email}</span>
+                                        {dm.avg_rating > 0 && (
+                                          <div className="flex items-center gap-1 text-yellow-500">
+                                            <Star className="w-3 h-3 fill-current" />
+                                            <span className="text-xs font-bold">{dm.avg_rating.toFixed(1)}</span>
+                                            <span className="text-xs text-muted-foreground">({dm.rating_count})</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                            <Button className="w-full" onClick={handleAssign} disabled={!selectedDeliveryMan}>
+                              Confirmar Asignación
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        {order.status === "delivered" ? "Entregado" : "Cancelado"}
+                      </Badge>
+                    )}
                     
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => handleSendInvoice(order)}
-                      title="Enviar Factura"
+                      onClick={() => handleOpenPreview(order)}
+                      title="Ver Factura"
                     >
-                      <FileText className="h-4 w-4" />
+                      <Eye className="h-4 w-4" />
                     </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenSellerAssign(order)}
-                      title="Asignar Vendedor"
-                    >
-                      <UserCheck className="h-4 w-4" />
-                    </Button>
+
+                    {order.status !== "delivered" && order.status !== "cancelled" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenSellerAssign(order)}
+                        title="Asignar Vendedor"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -422,6 +473,15 @@ export default function AdminOrdersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Preview */}
+      <InvoicePreview
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        order={previewOrder}
+        onSendInvoice={() => previewOrder && handleSendInvoice(previewOrder)}
+        sending={sendingInvoice}
+      />
     </div>
   );
 }

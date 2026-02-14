@@ -5,9 +5,9 @@ import { CheckoutForm } from "@/components/skating-store/checkout/CheckoutForm";
 import { OrderSummary } from "@/components/skating-store/checkout/OrderSummary";
 import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { createOrder, getProfile, updateProfile } from "@/lib/skating-store/supabase-queries";
-import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
-import { sendOrderNotification } from "@/lib/skating-store/notification-actions";
-import { createInAppNotification } from "@/lib/skating-store/in-app-notifications";
+import { generateAndSendInvoice, sendProformaInvoice } from "@/lib/skating-store/invoice-actions";
+import { sendOrderNotification, sendAdminNewOrderEmail } from "@/lib/skating-store/notification-actions";
+import { createInAppNotification, notifyAdminsNewOrder } from "@/lib/skating-store/in-app-notifications";
 import { ShippingInfo } from "@/types/skating-store";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -65,7 +65,21 @@ export default function CheckoutPage() {
       }
 
       const finalTotal = total + shippingTotal;
-      const order = await createOrder(items, shippingWithCoords, finalTotal, data.paymentMethod);
+      const order = await createOrder(items, { ...shippingWithCoords, email: user.email || "" }, finalTotal, data.paymentMethod);
+
+      const invoiceData = {
+        orderId: order.id,
+        customerEmail: user.email || "",
+        customerName: data.fullName,
+        address: data.address,
+        city: data.city,
+        phone: data.phone,
+        items,
+        subtotal: total,
+        shippingCost: shippingTotal,
+        total: finalTotal,
+        paymentMethod: data.paymentMethod,
+      };
       
       try {
         await sendOrderNotification({
@@ -82,15 +96,50 @@ export default function CheckoutPage() {
           message: `Tu pedido #${order.id.slice(0, 8)} ha sido recibido y está siendo procesado.`,
           type: 'success'
         });
+
+        // Send proforma (pre-invoice) for all orders
+        await sendProformaInvoice(invoiceData);
       } catch (notifError) {
-        console.error("Error sending initial order notification:", notifError);
+        console.error("Error sending initial notifications:", notifError);
       }
 
+      // Notify admins about the new order (in-app + email)
+      try {
+        const adminResult = await notifyAdminsNewOrder({
+          orderId: order.id,
+          customerName: data.fullName,
+          total: finalTotal,
+          paymentMethod: data.paymentMethod,
+          address: data.address,
+          city: data.city,
+          itemCount: items.length,
+        });
+
+        // Send email to admin emails returned by the API
+        if (adminResult?.emails?.length) {
+          await sendAdminNewOrderEmail({
+            orderId: order.id,
+            customerName: data.fullName,
+            customerEmail: user.email || "",
+            address: data.address,
+            city: data.city,
+            phone: data.phone,
+            total: finalTotal,
+            paymentMethod: data.paymentMethod,
+            itemCount: items.length,
+            adminEmails: adminResult.emails,
+          });
+        }
+      } catch (adminNotifError) {
+        console.error("Error notifying admins:", adminNotifError);
+      }
+
+      // If card payment, also send final invoice immediately (payment is instant)
       if (data.paymentMethod === 'card') {
         try {
-          await generateAndSendInvoice(order.id, user.email || "", finalTotal);
+          await generateAndSendInvoice(invoiceData);
         } catch (invoiceError) {
-          console.error("Error generating automatic invoice:", invoiceError);
+          console.error("Error generating final invoice:", invoiceError);
         }
       }
 

@@ -68,7 +68,7 @@ export default function UsersPage() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell className="font-mono text-xs">{user.id}</TableCell>
                 <TableCell>
-                  <Badge variant={user.role === 'ADMIN' ? 'destructive' : user.role === 'DELIVERY' ? 'secondary' : 'outline'}>
+                  <Badge variant={user.role === 'ADMIN' ? 'destructive' : user.role === 'DELIVERY' ? 'secondary' : user.role === 'SELLER' ? 'default' : 'outline'}>
                     {user.role}
                   </Badge>
                 </TableCell>
@@ -82,6 +82,7 @@ export default function UsersPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="USER">Usuario</SelectItem>
+                      <SelectItem value="SELLER">Vendedor</SelectItem>
                       <SelectItem value="DELIVERY">Repartidor</SelectItem>
                       <SelectItem value="ADMIN">Admin</SelectItem>
                     </SelectContent>

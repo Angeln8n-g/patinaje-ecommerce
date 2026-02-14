@@ -49,3 +49,33 @@ export async function markNotificationAsRead(notificationId: string) {
 export async function markAllNotificationsAsRead(userId: string) {
   await apiFetch("/api/notifications/read-all", { method: "PUT" });
 }
+
+interface AdminOrderNotification {
+  orderId: string;
+  customerName: string;
+  total: number;
+  paymentMethod: string;
+  address: string;
+  city: string;
+  itemCount: number;
+}
+
+export async function notifyAdminsNewOrder(data: AdminOrderNotification) {
+  try {
+    const totalFormatted = `RD$${data.total.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`;
+    const payment = data.paymentMethod === "card" ? "Tarjeta" : "Efectivo";
+    
+    const result = await apiFetch("/api/notifications/notify-admins", {
+      method: "POST",
+      body: {
+        order_id: data.orderId,
+        title: `🛒 Nuevo Pedido #${data.orderId.slice(0, 8)}`,
+        message: `${data.customerName} realizó un pedido de ${totalFormatted} (${data.itemCount} producto${data.itemCount > 1 ? "s" : ""}) — Pago: ${payment} — ${data.address}, ${data.city}`,
+        type: "info",
+      },
+    });
+    return result;
+  } catch (error) {
+    console.error("Error notifying admins:", error);
+  }
+}

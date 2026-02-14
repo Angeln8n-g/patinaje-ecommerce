@@ -88,6 +88,28 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
         });
       }
 
+      // Send final invoice after cash payment confirmation
+      const customerEmail = shipping?.email || order.customer_email;
+      if (customerEmail) {
+        try {
+          await generateAndSendInvoice({
+            orderId: order.id,
+            customerEmail,
+            customerName: shipping.fullName,
+            address: shipping.address,
+            city: shipping.city,
+            phone: shipping.phone,
+            items: order.items || [],
+            subtotal: order.total,
+            shippingCost: 0,
+            total: order.total,
+            paymentMethod: "cash",
+          });
+        } catch (invoiceErr) {
+          console.error("Error sending invoice after cash payment:", invoiceErr);
+        }
+      }
+
       toast.success("Pago confirmado y pedido entregado");
       setIsScannerOpen(false);
       onUpdate();
@@ -102,15 +124,26 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
   const handleSendInvoice = async () => {
     setIsLoading(true);
     try {
-      // Get customer email from order data
-      const customerEmail = order.shipping?.email || order.customer_email || order.user_email;
+      const customerEmail = shipping?.email || order.customer_email || order.user_email;
       
       if (!customerEmail) {
         toast.error("No se encontró el email del cliente");
         return;
       }
 
-      await generateAndSendInvoice(order.id, customerEmail, order.total);
+      await generateAndSendInvoice({
+        orderId: order.id,
+        customerEmail,
+        customerName: shipping.fullName,
+        address: shipping.address,
+        city: shipping.city,
+        phone: shipping.phone,
+        items: order.items || [],
+        subtotal: order.total,
+        shippingCost: 0,
+        total: order.total,
+        paymentMethod: order.payment_method || "card",
+      });
       toast.success("Factura enviada correctamente al cliente");
     } catch (error) {
       toast.error("Error al enviar la factura");

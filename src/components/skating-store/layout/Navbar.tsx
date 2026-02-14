@@ -28,6 +28,9 @@ export function Navbar() {
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const router = useRouter();
   const [isClient, setIsClient] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
+  const mobileSearchRef = React.useRef<HTMLInputElement>(null);
 
   const handleCartClick = () => {
     const event = new CustomEvent('open-cart');
@@ -106,7 +109,7 @@ export function Navbar() {
       <div className="flex h-20 items-center px-4 container mx-auto gap-4 md:gap-8 justify-between">
         {/* Mobile Menu Trigger */}
         <div className="md:hidden">
-          <Sheet>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
               <div className="p-2 -ml-2 cursor-pointer">
                 <Menu className="h-6 w-6" />
@@ -139,25 +142,25 @@ export function Navbar() {
                 )}
 
                 <nav className="flex flex-col gap-4">
-                  <Link href="/skating-store" className="flex items-center gap-2 text-lg font-medium">
+                  <Link href="/skating-store" className="flex items-center gap-2 text-lg font-medium" onClick={() => setMenuOpen(false)}>
                     <LayoutDashboard className="h-5 w-5" /> Inicio
                   </Link>
-                  <Link href="/skating-store/catalogo" className="flex items-center gap-2 text-lg font-medium">
+                  <Link href="/skating-store/catalogo" className="flex items-center gap-2 text-lg font-medium" onClick={() => setMenuOpen(false)}>
                     <Search className="h-5 w-5" /> Catálogo
                   </Link>
-                  <Link href="/skating-store/sobre-nosotros" className="flex items-center gap-2 text-lg font-medium">
+                  <Link href="/skating-store/sobre-nosotros" className="flex items-center gap-2 text-lg font-medium" onClick={() => setMenuOpen(false)}>
                     <Info className="h-5 w-5" /> Sobre Nosotros
                   </Link>
-                  <Link href="/skating-store/contacto" className="flex items-center gap-2 text-lg font-medium">
+                  <Link href="/skating-store/contacto" className="flex items-center gap-2 text-lg font-medium" onClick={() => setMenuOpen(false)}>
                     <Mail className="h-5 w-5" /> Contacto
                   </Link>
                   {isDelivery && (
-                    <Link href="/delivery" className="flex items-center gap-2 text-lg font-medium text-primary">
+                    <Link href="/delivery" className="flex items-center gap-2 text-lg font-medium text-primary" onClick={() => setMenuOpen(false)}>
                       <Truck className="h-5 w-5" /> Panel de Reparto
                     </Link>
                   )}
                   {isAdmin && (
-                    <Link href="/admin" className="flex items-center gap-2 text-lg font-medium text-primary">
+                    <Link href="/admin" className="flex items-center gap-2 text-lg font-medium text-primary" onClick={() => setMenuOpen(false)}>
                       <LayoutDashboard className="h-5 w-5" /> Panel Admin
                     </Link>
                   )}
@@ -208,7 +211,12 @@ export function Navbar() {
           </Link>
 
           {/* Search Icon Mobile */}
-          <div className="md:hidden flex items-center justify-center h-10 w-10" onClick={() => router.push('/skating-store/catalogo')}>
+          <div className="md:hidden flex items-center justify-center h-10 w-10 cursor-pointer" onClick={() => {
+            setMobileSearchOpen(!mobileSearchOpen);
+            if (!mobileSearchOpen) {
+              setTimeout(() => mobileSearchRef.current?.focus(), 100);
+            }
+          }}>
              <Search className="h-6 w-6" />
           </div>
 
@@ -282,6 +290,28 @@ export function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile Search Bar */}
+      {mobileSearchOpen && (
+        <div className="md:hidden px-4 pb-3 border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              ref={mobileSearchRef}
+              placeholder="Buscar en la tienda..."
+              className="pl-12 rounded-2xl bg-secondary/50 border border-border h-12 focus-visible:ring-primary shadow-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  router.push(`/skating-store/catalogo?search=${encodeURIComponent(searchTerm)}`);
+                  setMobileSearchOpen(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

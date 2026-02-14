@@ -120,3 +120,76 @@ export async function sendOrderNotification({
     // Don't throw, just log, so we don't break the main flow
   }
 }
+
+interface AdminNewOrderEmailData {
+  orderId: string;
+  customerName: string;
+  customerEmail: string;
+  address: string;
+  city: string;
+  phone: string;
+  total: number;
+  paymentMethod: string;
+  itemCount: number;
+  adminEmails: string[];
+}
+
+export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData) {
+  if (!resend || data.adminEmails.length === 0) {
+    console.log(`[Admin Email Simulated] New order ${data.orderId} to ${data.adminEmails.join(", ")}`);
+    return;
+  }
+
+  const totalFormatted = `RD$${data.total.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`;
+  const payment = data.paymentMethod === "card" ? "Tarjeta" : "Efectivo";
+  const adminUrl = `${APP_URL}/admin/orders`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: "RD Patina <noreply@hunykho.com>",
+      to: data.adminEmails,
+      subject: `🛒 Nuevo Pedido #${data.orderId.slice(0, 8)} — ${totalFormatted}`,
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+          <div style="background:#000;padding:24px 30px;text-align:center;">
+            <h1 style="color:#D7F000;margin:0;font-size:20px;text-transform:uppercase;letter-spacing:2px;">RD PATINA — ADMIN</h1>
+            <p style="color:#999;margin:4px 0 0;font-size:12px;">Nuevo Pedido Recibido</p>
+          </div>
+          <div style="padding:24px 30px;">
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;text-align:center;margin-bottom:20px;">
+              <span style="color:#16a34a;font-weight:700;font-size:14px;">NUEVO PEDIDO</span>
+            </div>
+            <table style="width:100%;font-size:14px;border-collapse:collapse;">
+              <tr><td style="padding:6px 0;color:#666;">Pedido:</td><td style="padding:6px 0;font-weight:600;">#${data.orderId.slice(0, 8).toUpperCase()}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Cliente:</td><td style="padding:6px 0;font-weight:600;">${data.customerName}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Email:</td><td style="padding:6px 0;">${data.customerEmail}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Teléfono:</td><td style="padding:6px 0;">${data.phone}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Dirección:</td><td style="padding:6px 0;">${data.address}, ${data.city}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Productos:</td><td style="padding:6px 0;">${data.itemCount} artículo${data.itemCount > 1 ? "s" : ""}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Pago:</td><td style="padding:6px 0;font-weight:600;">${payment}</td></tr>
+            </table>
+            <div style="margin-top:16px;padding:12px;background:#000;border-radius:8px;text-align:center;">
+              <span style="color:#D7F000;font-size:24px;font-weight:900;">${totalFormatted}</span>
+            </div>
+            <div style="margin-top:20px;text-align:center;">
+              <a href="${adminUrl}" style="background:#D7F000;color:#000;padding:14px 28px;border-radius:50px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:13px;display:inline-block;">
+                Gestionar Pedido
+              </a>
+            </div>
+          </div>
+          <div style="background:#f9fafb;padding:14px 30px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:11px;color:#999;">&copy; ${new Date().getFullYear()} RD Patina — Notificación Administrativa</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error("Admin email error:", error);
+    } else {
+      console.log(`Admin notification email sent for order ${data.orderId}`);
+    }
+  } catch (error: any) {
+    console.error("Error sending admin email:", error.message);
+  }
+}

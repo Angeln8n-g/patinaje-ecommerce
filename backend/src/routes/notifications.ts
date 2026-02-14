@@ -55,4 +55,36 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/notifications/notify-admins — notify all admins about a new order
+router.post("/notify-admins", requireAuth, async (req, res) => {
+  try {
+    const { order_id, title, message, type } = req.body;
+    const admins = await query("SELECT id, email FROM profiles WHERE role = 'ADMIN'");
+    
+    if (admins.rows.length === 0) {
+      return res.json({ notified: 0 });
+    }
+
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    let idx = 1;
+    for (const admin of admins.rows) {
+      placeholders.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4})`);
+      values.push(admin.id, order_id || null, title, message, type || "info");
+      idx += 5;
+    }
+
+    await query(
+      `INSERT INTO skating_notifications (user_id, order_id, title, message, type) VALUES ${placeholders.join(", ")}`,
+      values
+    );
+
+    const emails = admins.rows.map((a: any) => a.email).filter(Boolean);
+    res.json({ notified: admins.rows.length, emails });
+  } catch (err) {
+    console.error("Error notifying admins:", err);
+    res.status(500).json({ error: "Error al notificar administradores" });
+  }
+});
+
 export default router;
