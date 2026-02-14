@@ -66,7 +66,7 @@ Edita con tus valores reales:
 DATABASE_URL=postgresql://skating_user:TU_PASSWORD_SEGURO@localhost:5432/skating_store
 JWT_SECRET=07a9ca8c0f41aa67912f79127bf67e82ca45512db2b7f2a8fbf3633bda02ab96873a3f73ed48a116654774dc2886c8ba44a254f4111d36409451857481e87d8b
 PORT=4000
-CORS_ORIGIN=https://skating.hunykho.com,https://trae-patinaje-ecommerce-apa9.vercel.app
+CORS_ORIGIN=https://hunykho.com,https://trae-patinaje-ecommerce-apa9.vercel.app
 ```
 
 ## 7. Inicializar la base de datos

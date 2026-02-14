@@ -10,7 +10,7 @@ const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://skating.hunykho.com";
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://hunykho.com";
 
 // POST /api/auth/register
 router.post("/register", async (req, res) => {

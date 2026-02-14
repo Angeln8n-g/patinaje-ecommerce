@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 const resendApiKey = process.env.RESEND_API_KEY || process.env.NEXT_PUBLIC_RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://skating.hunykho.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://hunykho.com';
 
 interface NotificationData {
   orderId: string;
