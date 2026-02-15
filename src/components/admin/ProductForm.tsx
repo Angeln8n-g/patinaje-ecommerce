@@ -17,6 +17,7 @@ import { createProduct, updateProduct } from "@/lib/skating-store/product-action
 import { getCategories } from "@/lib/skating-store/content-actions";
 import { Plus, X, Image as ImageIcon, RefreshCw, Printer } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 function generateBarcode(): string {
   const prefix = "SK";
@@ -47,7 +48,6 @@ interface ProductFormProps {
 export function ProductForm({ initialData }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [imageUrlInput, setImageUrlInput] = useState("");
   const [variantInput, setVariantInput] = useState("");
   const router = useRouter();
 
@@ -103,26 +103,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
     }
   };
 
-  const addImage = () => {
-    if (!imageUrlInput) return;
-    try {
-      new URL(imageUrlInput);
-      const currentImages = form.getValues("images");
-      form.setValue("images", [...currentImages, imageUrlInput]);
-      setImageUrlInput("");
-    } catch {
-      toast.error("URL inválida");
-    }
-  };
 
-  const removeImage = (index: number) => {
-    const currentImages = form.getValues("images");
-    form.setValue("images", currentImages.filter((_, i) => i !== index));
-  };
 
-  const isVideo = (url: string) => {
-    return url.toLowerCase().match(/\.(mp4|webm|ogg)$/) || url.includes("video");
-  };
 
   const addVariant = () => {
     if (!variantInput) return;
@@ -343,75 +325,24 @@ export function ProductForm({ initialData }: ProductFormProps) {
         />
 
         {/* Imágenes */}
-        <div className="space-y-4">
-          <FormLabel>Imágenes del Producto</FormLabel>
-          <div className="flex gap-2">
-            <Input 
-              placeholder="https://ejemplo.com/imagen.jpg" 
-              value={imageUrlInput}
-              onChange={(e) => setImageUrlInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addImage();
-                }
-              }}
-            />
-            <Button type="button" onClick={addImage} size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <FormField
-            control={form.control}
-            name="images"
-            render={({ field }) => (
-              <FormItem>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  {field.value.map((url, index) => (
-                    <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border bg-muted">
-                      {isVideo(url) ? (
-                        <video src={url} className="object-cover w-full h-full opacity-70" muted />
-                      ) : (
-                        <img src={url} alt={`Product ${index}`} className="object-cover w-full h-full" />
-                      )}
-                      
-                      {isVideo(url) && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="bg-black/50 rounded-full p-2">
-                             <div className="ml-1 h-0 w-0 border-y-[6px] border-y-transparent border-l-[10px] border-l-white" />
-                          </div>
-                        </div>
-                      )}
-
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                        onClick={() => removeImage(index)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      {index === 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                          Principal
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {field.value.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg text-muted-foreground">
-                      <ImageIcon className="h-8 w-8 mb-2" />
-                      <p>No hay imágenes añadidas</p>
-                    </div>
-                  )}
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name="images"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Imágenes del Producto</FormLabel>
+              <FormControl>
+                <ImageUpload
+                  value={field.value}
+                  onChange={field.onChange}
+                  folder="products"
+                  max={10}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Variantes */}
         <div className="space-y-4 border p-4 rounded-lg bg-muted/20">

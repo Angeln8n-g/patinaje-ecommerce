@@ -16,6 +16,7 @@ import inventoryRoutes from "./routes/inventory.js";
 import deliveryRoutes from "./routes/delivery.js";
 import notificationRoutes from "./routes/notifications.js";
 import contactRoutes from "./routes/contact.js";
+import uploadRoutes from "./routes/upload.js";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
@@ -42,6 +43,7 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

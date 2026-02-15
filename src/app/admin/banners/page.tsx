@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Trash2, Plus, ExternalLink, Pencil, Search, Image, Link2, Tag, Package, Globe } from "lucide-react";
 import { PromoTextManager } from "@/components/admin/PromoTextManager";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 type LinkType = "none" | "product" | "category" | "custom";
 
@@ -229,18 +230,15 @@ export default function BannersPage() {
                   />
                 </div>
 
-                {/* Image URL */}
+                {/* Image */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><Image className="h-4 w-4" /> URL de Imagen, GIF o Video</Label>
-                  <Input
-                    value={form.image_url}
-                    onChange={(e) => setForm(prev => ({ ...prev, image_url: e.target.value }))}
-                    placeholder="https://..."
+                  <Label className="flex items-center gap-2"><Image className="h-4 w-4" /> Imagen del Banner</Label>
+                  <ImageUpload
+                    value={form.image_url ? [form.image_url] : []}
+                    onChange={(urls) => setForm(prev => ({ ...prev, image_url: urls[0] || "" }))}
+                    folder="banners"
+                    single
                   />
-                  <p className="text-xs text-muted-foreground">JPG, PNG, GIF, MP4, WebM</p>
-                  {form.image_url && (
-                    <img src={form.image_url} alt="Preview" className="h-28 w-full object-cover rounded border" />
-                  )}
                 </div>
 
                 {/* Link Type Selector */}
