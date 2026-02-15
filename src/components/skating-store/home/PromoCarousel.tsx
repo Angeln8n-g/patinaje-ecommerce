@@ -55,7 +55,7 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
   };
 
   return (
-    <section className="relative h-[450px] md:h-[600px] lg:h-[700px] w-full overflow-hidden mb-12 group rounded-[32px]">
+    <section className="relative w-full overflow-hidden mb-12 group rounded-[32px] aspect-[16/9] md:aspect-[21/9]">
       {/* Slides */}
       {banners.map((banner, index) => (
         <div

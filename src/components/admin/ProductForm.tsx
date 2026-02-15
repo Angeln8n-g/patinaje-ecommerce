@@ -93,12 +93,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
         toast.success("Producto creado correctamente");
       }
       
-      router.push("/admin/products");
-      router.refresh();
+      window.location.href = "/admin/products";
     } catch (error) {
       console.error(error);
       toast.error("Error al guardar el producto");
-    } finally {
       setIsLoading(false);
     }
   };
