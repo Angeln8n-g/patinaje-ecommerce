@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Trash2, Plus, ExternalLink, Pencil, Search, Image, Link2, Tag, Package, Globe } from "lucide-react";
 import { PromoTextManager } from "@/components/admin/PromoTextManager";
@@ -26,6 +27,7 @@ interface BannerForm {
   link_url: string;
   active: boolean;
   display_order: number;
+  category_ids: string[];
 }
 
 const EMPTY_FORM: BannerForm = {
@@ -35,6 +37,7 @@ const EMPTY_FORM: BannerForm = {
   link_url: "",
   active: true,
   display_order: 0,
+  category_ids: [],
 };
 
 export default function BannersPage() {
@@ -118,6 +121,15 @@ export default function BannersPage() {
     if (type === "none") setForm(prev => ({ ...prev, link_url: "" }));
   };
 
+  const handleCategoryToggle = (categoryId: string) => {
+    setForm(prev => ({
+      ...prev,
+      category_ids: prev.category_ids.includes(categoryId)
+        ? prev.category_ids.filter(id => id !== categoryId)
+        : [...prev.category_ids, categoryId],
+    }));
+  };
+
   const openCreate = () => {
     setEditingBanner(null);
     setForm(EMPTY_FORM);
@@ -137,6 +149,7 @@ export default function BannersPage() {
       link_url: banner.link_url || "",
       active: banner.active,
       display_order: banner.display_order,
+      category_ids: banner.categories?.map(c => c.id) || banner.category_ids || [],
     });
     const detected = detectLinkType(banner.link_url || "");
     setLinkType(detected.type);
@@ -152,11 +165,12 @@ export default function BannersPage() {
       return;
     }
     try {
+      const payload = { ...form, category_ids: form.category_ids };
       if (editingBanner) {
-        await updateBanner(editingBanner.id, form);
+        await updateBanner(editingBanner.id, payload);
         toast.success("Banner actualizado");
       } else {
-        await createBanner(form);
+        await createBanner(payload);
         toast.success("Banner creado");
       }
       setIsDialogOpen(false);
@@ -336,6 +350,34 @@ export default function BannersPage() {
                   )}
                 </div>
 
+                {/* Category Selector */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2"><Tag className="h-4 w-4" /> Categorías asociadas <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                  {categories.length > 0 ? (
+                    <div className="rounded-lg border p-3 bg-muted/30 max-h-48 overflow-y-auto space-y-1">
+                      {categories.map(cat => (
+                        <label
+                          key={cat.id}
+                          className={`flex items-center gap-3 p-2 rounded-md cursor-pointer text-sm transition-colors hover:bg-accent ${form.category_ids.includes(cat.id) ? "bg-primary/10 ring-1 ring-primary" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={form.category_ids.includes(cat.id)}
+                            onChange={() => handleCategoryToggle(cat.id)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <span className="font-medium">{cat.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No hay categorías disponibles</p>
+                  )}
+                  {form.category_ids.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Sin categorías = banner general (solo carrusel principal)</p>
+                  )}
+                </div>
+
                 {/* Order & Active */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -373,6 +415,7 @@ export default function BannersPage() {
                   <TableHead>Imagen</TableHead>
                   <TableHead>Título</TableHead>
                   <TableHead>Link</TableHead>
+                  <TableHead>Categorías</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-[100px]">Acciones</TableHead>
                 </TableRow>
@@ -391,6 +434,21 @@ export default function BannersPage() {
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {banner.categories && banner.categories.length > 0 ? (
+                          banner.categories.map((cat) => (
+                            <Badge key={cat.id} variant="secondary" className="text-xs">
+                              {cat.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            General
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Switch checked={banner.active} onCheckedChange={() => handleToggleActive(banner.id, banner.active)} />

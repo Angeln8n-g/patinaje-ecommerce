@@ -106,6 +106,17 @@ CREATE TABLE IF NOT EXISTS banners (
 );
 
 -- ==========================================
+-- banner_categories (many-to-many: banners ↔ categories)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS banner_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  banner_id UUID NOT NULL REFERENCES banners(id) ON DELETE CASCADE,
+  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(banner_id, category_id)
+);
+
+-- ==========================================
 -- promo_text_banners
 -- ==========================================
 CREATE TABLE IF NOT EXISTS promo_text_banners (
@@ -323,6 +334,8 @@ CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_movements(product_
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON skating_notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_product ON skating_product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_banner_categories_banner ON banner_categories(banner_id);
+CREATE INDEX IF NOT EXISTS idx_banner_categories_category ON banner_categories(category_id);
 
 -- ==========================================
 -- password_reset_tokens

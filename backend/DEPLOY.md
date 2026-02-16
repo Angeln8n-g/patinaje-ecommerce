@@ -75,6 +75,31 @@ CORS_ORIGIN=https://hunykho.com,https://trae-patinaje-ecommerce-apa9.vercel.app
 npx tsx src/db/init.ts
 ```
 
+## 7.1 Aplicar migraciones
+
+Después de la inicialización (o en cada deploy con cambios de esquema), ejecuta las migraciones pendientes:
+
+```bash
+npm run db:migrate
+```
+
+Esto aplica en orden todos los archivos `.sql` de `src/db/migrations/` que no se hayan ejecutado previamente. Las migraciones aplicadas se registran en la tabla `schema_migrations` para no repetirse.
+
+Migraciones actuales:
+- `001_oauth_and_reset.sql` — OAuth y reset de contraseña
+- `002_fiscal_module.sql` — Módulo fiscal (config, secuencias, facturas, auditoría)
+- `003_banner_categories.sql` — Relación banners-categorías
+
+> Para futuras actualizaciones con cambios de base de datos:
+> ```bash
+> cd /home/skating-store/backend
+> git pull
+> npm install
+> npm run db:migrate
+> npm run build
+> pm2 restart skating-api
+> ```
+
 ## 8. Compilar y ejecutar
 
 ```bash

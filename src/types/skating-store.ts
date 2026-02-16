@@ -17,6 +17,8 @@ export interface Banner {
   active: boolean;
   display_order: number;
   created_at: string;
+  category_ids?: string[];   // IDs de categorías asociadas
+  categories?: Category[];   // Categorías populadas (para admin)
 }
 
 export interface PromoTextBanner {

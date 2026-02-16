@@ -46,18 +46,23 @@ export async function deleteCategory(id: string) {
 // Banners
 export async function getBanners(activeOnly = false): Promise<Banner[]> {
   try {
-    const qs = activeOnly ? "?active=true" : "";
-    const res = await fetch(`${API_URL}/api/content/banners${qs}`, { cache: "no-store" });
-    return res.ok ? res.json() : [];
+    if (activeOnly) {
+      const res = await fetch(`${API_URL}/api/content/banners?active=true`, { cache: "no-store" });
+      return res.ok ? res.json() : [];
+    }
+    // Admin listing: use authenticated fetch to get banners with associated categories
+    return await authServerFetch("/api/content/banners");
   } catch { return []; }
 }
 
 export async function createBanner(banner: Omit<Banner, "id" | "created_at">) {
-  return authServerFetch("/api/content/banners", { method: "POST", body: banner });
+  const { categories, ...payload } = banner;
+  return authServerFetch("/api/content/banners", { method: "POST", body: payload });
 }
 
 export async function updateBanner(id: string, updates: Partial<Banner>) {
-  return authServerFetch(`/api/content/banners/${id}`, { method: "PUT", body: updates });
+  const { categories, ...payload } = updates;
+  return authServerFetch(`/api/content/banners/${id}`, { method: "PUT", body: payload });
 }
 
 export async function deleteBanner(id: string) {

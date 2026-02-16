@@ -1,7 +1,8 @@
 import { ProductGrid } from "@/components/skating-store/products/ProductGrid";
 import { CategoryFilter } from "@/components/skating-store/products/CategoryFilter";
+import { PromoCarousel } from "@/components/skating-store/home/PromoCarousel";
 import { getProductsFilteredServer } from "@/lib/skating-store/product-queries";
-import { getCategories } from "@/lib/skating-store/content-queries";
+import { getCategories, getBannersByCategory } from "@/lib/skating-store/content-queries";
 import { ProductCategory } from "@/types/skating-store";
 
 export const dynamic = 'force-dynamic';
@@ -15,9 +16,10 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const category = (resolvedSearchParams?.category as ProductCategory) || null;
   const search = (resolvedSearchParams?.search as string) || null;
   
-  const [products, categories] = await Promise.all([
+  const [products, categories, categoryBanners] = await Promise.all([
     getProductsFilteredServer(category, search),
-    getCategories()
+    getCategories(),
+    category ? getBannersByCategory(category) : Promise.resolve([])
   ]);
 
   return (
@@ -33,6 +35,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       </div>
       
       <CategoryFilter categories={categories} />
+
+      {categoryBanners.length > 0 && (
+        <div className="w-full mb-6">
+          <PromoCarousel banners={categoryBanners} />
+        </div>
+      )}
       
       <ProductGrid products={products} />
     </div>

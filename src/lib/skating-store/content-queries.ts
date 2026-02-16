@@ -18,6 +18,14 @@ export async function getBanners(activeOnly = false): Promise<Banner[]> {
   }
 }
 
+export async function getBannersByCategory(categorySlug: string): Promise<Banner[]> {
+  try {
+    return await serverFetch<Banner[]>(`/api/content/banners?category=${categorySlug}&active=true`);
+  } catch {
+    return [];
+  }
+}
+
 export async function getActivePromoTextBanner(): Promise<PromoTextBanner | null> {
   try {
     const banners = await serverFetch<PromoTextBanner[]>("/api/content/promo-banners?active=true");
