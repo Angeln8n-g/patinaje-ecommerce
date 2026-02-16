@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Loader2, Truck, FileText, Star, AlertTriangle, MapPin, UserCheck, Eye, Map } from "lucide-react";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
 import { InvoicePreview } from "@/components/admin/InvoicePreview";
+import { FiscalInvoiceDialog } from "@/components/fiscal/FiscalInvoiceDialog";
 import { formatCurrency } from "@/lib/utils";
 
 const OrdersMap = dynamic(() => import("@/components/admin/OrdersMap"), {
@@ -52,6 +53,11 @@ export default function AdminOrdersPage() {
 
   // Map toggle
   const [showMap, setShowMap] = useState(false);
+
+  // Fiscal invoice state
+  const [fiscalOpen, setFiscalOpen] = useState(false);
+  const [fiscalOrderId, setFiscalOrderId] = useState("");
+  const [fiscalCustomerName, setFiscalCustomerName] = useState("");
 
   const loadData = async (silent = false) => {
     if (isRefreshing) return;
@@ -393,6 +399,21 @@ export default function AdminOrdersPage() {
                         <UserCheck className="h-4 w-4" />
                       </Button>
                     )}
+
+                    {(order.status === "delivered" || order.status === "confirmed") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFiscalOrderId(order.id);
+                          setFiscalCustomerName(order.customer_name || "");
+                          setFiscalOpen(true);
+                        }}
+                        title="Generar e-CF"
+                      >
+                        <FileText className="h-4 w-4 text-blue-600" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -481,6 +502,14 @@ export default function AdminOrdersPage() {
         order={previewOrder}
         onSendInvoice={() => previewOrder && handleSendInvoice(previewOrder)}
         sending={sendingInvoice}
+      />
+
+      {/* Fiscal Invoice Dialog */}
+      <FiscalInvoiceDialog
+        open={fiscalOpen}
+        onOpenChange={setFiscalOpen}
+        orderId={fiscalOrderId}
+        customerName={fiscalCustomerName}
       />
     </div>
   );

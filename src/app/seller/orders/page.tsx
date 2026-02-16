@@ -21,12 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, ArrowUp, ArrowDown, Receipt } from "lucide-react";
 import { getSellerOrders, markOrderAsDispatched } from "@/lib/skating-store/seller-actions";
 import { createProductExchange, searchProductsForPOS } from "@/lib/skating-store/pos-actions";
 import { Order, Product } from "@/types/skating-store";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FiscalInvoiceDialog } from "@/components/fiscal/FiscalInvoiceDialog";
 
 const statusLabels: Record<string, string> = {
   pending: "Pendiente",
@@ -53,6 +54,11 @@ export default function SellerOrdersPage() {
   const [exchangeJustification, setExchangeJustification] = useState("");
   const [exchangeProcessing, setExchangeProcessing] = useState(false);
   const [exchangeSearching, setExchangeSearching] = useState(false);
+
+  // Fiscal invoice state
+  const [fiscalOpen, setFiscalOpen] = useState(false);
+  const [fiscalOrderId, setFiscalOrderId] = useState("");
+  const [fiscalCustomerName, setFiscalCustomerName] = useState("");
 
   const loadOrders = async (from?: string, to?: string) => {
     setLoading(true);
@@ -261,6 +267,20 @@ export default function SellerOrdersPage() {
                             <RefreshCw className="h-4 w-4" />
                           </Button>
                         )}
+                        {(order.status === "delivered" || order.status === "confirmed") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setFiscalOrderId(order.id);
+                              setFiscalCustomerName(order.shipping?.fullName || "");
+                              setFiscalOpen(true);
+                            }}
+                            title="Generar e-CF"
+                          >
+                            <Receipt className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -422,6 +442,14 @@ export default function SellerOrdersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Fiscal Invoice Dialog */}
+      <FiscalInvoiceDialog
+        open={fiscalOpen}
+        onOpenChange={setFiscalOpen}
+        orderId={fiscalOrderId}
+        customerName={fiscalCustomerName}
+      />
     </div>
   );
 }

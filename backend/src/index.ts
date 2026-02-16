@@ -17,6 +17,7 @@ import deliveryRoutes from "./routes/delivery.js";
 import notificationRoutes from "./routes/notifications.js";
 import contactRoutes from "./routes/contact.js";
 import uploadRoutes from "./routes/upload.js";
+import fiscalRoutes from "./routes/fiscal.js";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
@@ -44,6 +45,7 @@ app.use("/api/delivery", deliveryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/fiscal", fiscalRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

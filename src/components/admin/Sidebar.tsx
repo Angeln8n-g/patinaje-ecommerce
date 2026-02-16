@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode, UserCheck } from "lucide-react";
+import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode, UserCheck, Receipt } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
@@ -69,6 +69,11 @@ const navItems = [
     icon: MapPin,
   },
   {
+    title: "Facturación Fiscal",
+    href: "/admin/fiscal",
+    icon: Receipt,
+  },
+  {
     title: "Configuración",
     href: "/admin/settings",
     icon: Settings,
@@ -97,7 +102,7 @@ export function Sidebar() {
             <span
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname === item.href ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href)) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
               )}
             >
               <item.icon className="h-4 w-4" />
