@@ -93,6 +93,7 @@ Migraciones actuales:
 - `003_banner_categories.sql` — Relación banners-categorías
 - `004_variant_prices.sql` — Precios por variante de producto
 - `005_promo_waitlist.sql` — Sistema de lista de espera para promociones (promo_status en banners + tabla promo_waitlist)
+- `006_order_fiscal_data.sql` — Columna fiscal_data (JSONB) en skating_orders para persistir datos de comprobante fiscal
 
 > Para futuras actualizaciones con cambios de base de datos:
 > ```bash

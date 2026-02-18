@@ -333,7 +333,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
     }
 
     const date = new Date();
-    const invoiceNumber = "FAC-" + date.getFullYear() + "-" + order_id.substring(0, 4).toUpperCase() + "-" + String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+    const invoiceNumber = "FAC-" + date.getFullYear() + "-" + order_id.substring(0, 6).toUpperCase();
     const result = await query(
       "INSERT INTO skating_invoices (order_id, invoice_number, customer_email, total_amount, status) VALUES ($1,$2,$3,$4,'sent') RETURNING *",
       [order_id, invoiceNumber, customer_email, total]
