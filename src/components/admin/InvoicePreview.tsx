@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { Send } from "lucide-react";
+import { getFiscalConfig } from "@/lib/skating-store/fiscal-actions";
 
 const ITBIS_RATE = 0.18;
 
@@ -27,6 +29,14 @@ interface InvoicePreviewProps {
 }
 
 export function InvoicePreview({ open, onOpenChange, order, onSendInvoice, sending }: InvoicePreviewProps) {
+  const [storeConfig, setStoreConfig] = useState<any>(null);
+
+  useEffect(() => {
+    if (open) {
+      getFiscalConfig().then(setStoreConfig).catch(() => setStoreConfig(null));
+    }
+  }, [open]);
+
   if (!order) return null;
 
   const shipping = order.shipping || {};
@@ -57,6 +67,18 @@ export function InvoicePreview({ open, onOpenChange, order, onSendInvoice, sendi
           <p className="text-zinc-400 text-xs mt-1">
             {isPaid ? "Factura" : "Pre-Factura"}
           </p>
+          {storeConfig?.rnc_emisor && (
+            <div className="mt-2">
+              <p className="text-zinc-400 text-[10px]">
+                {storeConfig.razon_social} • RNC: {storeConfig.rnc_emisor}
+              </p>
+              {storeConfig.direccion_fiscal && (
+                <p className="text-zinc-500 text-[9px]">
+                  {storeConfig.direccion_fiscal}{storeConfig.telefono ? ` • Tel: ${storeConfig.telefono}` : ""}
+                </p>
+              )}
+            </div>
+          )}
         </DialogHeader>
 
         <div className="p-6 space-y-5">

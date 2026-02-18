@@ -22,8 +22,11 @@ export default function FiscalConfigPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [cfg, hist] = await Promise.all([getFiscalConfig(), getFiscalConfigHistory()]);
-      setConfig(cfg);
+      const [cfg, hist] = await Promise.all([
+        getFiscalConfig().catch(() => null),
+        getFiscalConfigHistory().catch(() => []),
+      ]);
+      setConfig(cfg || { rnc_emisor: "", razon_social: "", nombre_comercial: "", direccion_fiscal: "", telefono: "", correo: "", ambiente: "pruebas" });
       setHistory(hist || []);
     } catch {
       toast.error("Error al cargar configuración");

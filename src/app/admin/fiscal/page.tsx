@@ -53,17 +53,17 @@ export default function FiscalDashboardPage() {
     setIsLoading(true);
     try {
       const [dash, inv] = await Promise.all([
-        getFiscalDashboard(),
+        getFiscalDashboard().catch(() => null),
         getFiscalInvoices({
-          estado: filtroEstado || undefined,
-          tipo: filtroTipo || undefined,
+          estado: filtroEstado && filtroEstado !== "all" ? filtroEstado : undefined,
+          tipo: filtroTipo && filtroTipo !== "all" ? filtroTipo : undefined,
           desde: filtroDesde || undefined,
           hasta: filtroHasta || undefined,
           limit: 50,
-        }),
+        }).catch(() => null),
       ]);
       setDashboard(dash);
-      setInvoices(inv.invoices || []);
+      setInvoices(inv?.data || inv?.invoices || []);
     } catch {
       toast.error("Error al cargar datos fiscales");
     } finally {
@@ -107,7 +107,7 @@ export default function FiscalDashboardPage() {
       {/* Dashboard cards */}
       {dashboard && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.entries(dashboard.porEstado || {}).map(([estado, count]) => (
+          {Object.entries(dashboard.conteos_por_estado || dashboard.porEstado || {}).map(([estado, count]) => (
             <Card key={estado}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">

@@ -28,6 +28,25 @@ async function apiFetch(endpoint: string, options: { method?: string; body?: any
 
 const ITBIS_RATE = 0.18;
 
+interface StoreConfig {
+  rnc_emisor?: string;
+  razon_social?: string;
+  nombre_comercial?: string;
+  direccion_fiscal?: string;
+  telefono?: string;
+  correo?: string;
+}
+
+/** Fetch store fiscal config (emisor data) — cached per request */
+async function getStoreConfig(): Promise<StoreConfig | null> {
+  try {
+    const config = await apiFetch("/api/fiscal/config");
+    return config || null;
+  } catch {
+    return null;
+  }
+}
+
 interface FiscalData {
   rnc: string;
   nombre: string;
@@ -110,7 +129,7 @@ function buildFiscalSection(fiscalData: FiscalData): string {
     </div>`;
 }
 
-function buildInvoiceHtml(data: InvoiceData, invoiceNumber: string, type: "proforma" | "final"): string {
+function buildInvoiceHtml(data: InvoiceData, invoiceNumber: string, type: "proforma" | "final", storeConfig?: StoreConfig | null): string {
   const isProforma = type === "proforma";
   const title = isProforma ? "Pre-Factura" : "Factura";
   const statusLabel = isProforma ? "PENDIENTE DE PAGO" : "PAGADO";
@@ -124,10 +143,22 @@ function buildInvoiceHtml(data: InvoiceData, invoiceNumber: string, type: "profo
 
   const fiscalSection = data.fiscalData ? buildFiscalSection(data.fiscalData) : "";
 
+  // Store/emisor info for header
+  const storeRnc = storeConfig?.rnc_emisor || "";
+  const storeRazonSocial = storeConfig?.razon_social || "";
+  const storeDireccion = storeConfig?.direccion_fiscal || "";
+  const storeTelefono = storeConfig?.telefono || "";
+
+  const storeInfoHtml = storeRnc ? `
+    <p style="color:#aaa;margin:6px 0 0;font-size:11px;">${storeRazonSocial}${storeRnc ? ` • RNC: ${storeRnc}` : ""}</p>
+    ${storeDireccion ? `<p style="color:#888;margin:2px 0 0;font-size:10px;">${storeDireccion}${storeTelefono ? ` • Tel: ${storeTelefono}` : ""}</p>` : ""}
+  ` : "";
+
   return `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:640px;margin:auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
   <div style="background:#000;padding:24px 30px;text-align:center;">
     <h1 style="color:#D7F000;margin:0;font-size:22px;text-transform:uppercase;letter-spacing:2px;">RD PATINA</h1>
     <p style="color:#999;margin:4px 0 0;font-size:12px;">${title}</p>
+    ${storeInfoHtml}
   </div>
   <div style="padding:24px 30px;">
     <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
@@ -192,7 +223,7 @@ function buildInvoiceHtml(data: InvoiceData, invoiceNumber: string, type: "profo
 }
 
 /** Generate a PDF invoice using jsPDF */
-function buildInvoicePdf(data: InvoiceData, invoiceNumber: string, type: "proforma" | "final"): Buffer {
+function buildInvoicePdf(data: InvoiceData, invoiceNumber: string, type: "proforma" | "final", storeConfig?: StoreConfig | null): Buffer {
   const isProforma = type === "proforma";
   const title = isProforma ? "Pre-Factura" : "Factura";
   const statusLabel = isProforma ? "PENDIENTE DE PAGO" : "PAGADO";
@@ -209,8 +240,9 @@ function buildInvoicePdf(data: InvoiceData, invoiceNumber: string, type: "profor
   let y = 0;
 
   // --- Header (black bar) ---
+  const headerH = storeConfig?.rnc_emisor ? 40 : 32;
   doc.setFillColor(0, 0, 0);
-  doc.rect(0, 0, pageW, 32, "F");
+  doc.rect(0, 0, pageW, headerH, "F");
   doc.setTextColor(215, 240, 0); // #D7F000
   doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
@@ -219,7 +251,21 @@ function buildInvoicePdf(data: InvoiceData, invoiceNumber: string, type: "profor
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(title, pageW / 2, 25, { align: "center" });
-  y = 40;
+
+  // Store fiscal info in header
+  if (storeConfig?.rnc_emisor) {
+    doc.setTextColor(170, 170, 170);
+    doc.setFontSize(7);
+    const storeInfo = `${storeConfig.razon_social || ""} • RNC: ${storeConfig.rnc_emisor}`;
+    doc.text(storeInfo, pageW / 2, 31, { align: "center" });
+    if (storeConfig.direccion_fiscal) {
+      doc.setFontSize(6);
+      doc.setTextColor(136, 136, 136);
+      const addr = `${storeConfig.direccion_fiscal}${storeConfig.telefono ? ` • Tel: ${storeConfig.telefono}` : ""}`;
+      doc.text(addr, pageW / 2, 36, { align: "center" });
+    }
+  }
+  y = headerH + 8;
 
   // --- Invoice number & date ---
   doc.setTextColor(100, 100, 100);
@@ -419,7 +465,8 @@ export async function sendProformaInvoice(data: InvoiceData) {
       return { success: true, invoiceNumber };
     }
 
-    const html = buildInvoiceHtml(data, invoiceNumber, "proforma");
+    const storeConfig = await getStoreConfig();
+    const html = buildInvoiceHtml(data, invoiceNumber, "proforma", storeConfig);
     const { error } = await resend.emails.send({
       from: "RD Patina <noreply@hunykho.com>",
       to: data.customerEmail,
@@ -459,8 +506,9 @@ export async function generateAndSendInvoice(data: InvoiceData, { force = false 
       return { success: true, invoiceNumber };
     }
 
-    const html = buildInvoiceHtml(data, invoiceNumber, "final");
-    const pdfBuffer = buildInvoicePdf(data, invoiceNumber, "final");
+    const storeConfig = await getStoreConfig();
+    const html = buildInvoiceHtml(data, invoiceNumber, "final", storeConfig);
+    const pdfBuffer = buildInvoicePdf(data, invoiceNumber, "final", storeConfig);
     const { error } = await resend.emails.send({
       from: "RD Patina <noreply@hunykho.com>",
       to: data.customerEmail,
