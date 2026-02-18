@@ -1,7 +1,7 @@
 import { getProductByIdServer, getProductReviewsServer } from "@/lib/skating-store/product-queries";
 import { getProductsServer } from "@/lib/skating-store/product-queries";
 import { ProductGallery } from "@/components/skating-store/products/ProductGallery";
-import { ProductActions, getVariantPrice } from "@/components/skating-store/products/ProductActions";
+import { ProductActions } from "@/components/skating-store/products/ProductActions";
 import { ProductReviews } from "@/components/skating-store/products/ProductReviews";
 import { notFound } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
