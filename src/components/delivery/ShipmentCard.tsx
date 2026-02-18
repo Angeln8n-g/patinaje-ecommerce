@@ -104,6 +104,7 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
             shippingCost: 0,
             total: order.total,
             paymentMethod: "cash",
+            fiscalData: order.fiscal_data || null,
           });
         } catch (invoiceErr) {
           console.error("Error sending invoice after cash payment:", invoiceErr);
@@ -143,6 +144,7 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
         shippingCost: 0,
         total: order.total,
         paymentMethod: order.payment_method || "card",
+        fiscalData: order.fiscal_data || null,
       }, { force: true });
       toast.success("Factura enviada correctamente al cliente");
     } catch (error) {

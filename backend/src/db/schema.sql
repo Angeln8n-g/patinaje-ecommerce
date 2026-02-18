@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS skating_orders (
   order_type VARCHAR(20) DEFAULT 'online',
   shipping_lat DECIMAL(10,8),
   shipping_lng DECIMAL(11,8),
+  fiscal_data JSONB DEFAULT NULL,
   dispatched_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

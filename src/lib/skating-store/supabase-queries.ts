@@ -79,12 +79,14 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
     order_type: dbOrder.order_type,
     dispatched_at: dbOrder.dispatched_at,
     created_at: dbOrder.created_at,
+    fiscal_data: dbOrder.fiscal_data ? (typeof dbOrder.fiscal_data === "string" ? JSON.parse(dbOrder.fiscal_data) : dbOrder.fiscal_data) : null,
   };
 }
 
 export async function createOrder(
   items: CartItem[], shipping: ShippingInfo, total: number,
-  paymentMethod: "card" | "cash" = "card"
+  paymentMethod: "card" | "cash" = "card",
+  fiscalData?: any
 ) {
   const body = {
     customer_name: shipping.fullName,
@@ -98,6 +100,7 @@ export async function createOrder(
     payment_method: paymentMethod,
     shipping_lat: shipping.lat,
     shipping_lng: shipping.lng,
+    fiscal_data: fiscalData || null,
   };
   const order = await authFetch("/api/orders", { method: "POST", body });
   return mapDbOrderToOrder(order);

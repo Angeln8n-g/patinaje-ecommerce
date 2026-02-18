@@ -123,6 +123,7 @@ export interface Order {
   order_type?: 'online' | 'in_store';
   dispatched_at?: string;
   created_at: string;
+  fiscal_data?: any;
 }
 
 export type ShipmentStatus = 'ASIGNADO' | 'EN_RUTA' | 'CERCA' | 'ENTREGADO';

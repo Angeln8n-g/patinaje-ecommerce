@@ -67,7 +67,7 @@ export default function CheckoutPage() {
       }
 
       const finalTotal = total + shippingTotal;
-      const order = await createOrder(items, { ...shippingWithCoords, email: user.email || "" }, finalTotal, data.paymentMethod);
+      const order = await createOrder(items, { ...shippingWithCoords, email: user.email || "" }, finalTotal, data.paymentMethod, fiscalData);
 
       const invoiceData = {
         orderId: order.id,

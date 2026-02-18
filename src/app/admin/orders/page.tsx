@@ -162,6 +162,7 @@ export default function AdminOrdersPage() {
         shippingCost: 0,
         total: order.total,
         paymentMethod: order.payment_method || "card",
+        fiscalData: order.fiscal_data || null,
       }, { force: true });
       toast.success("Factura generada y enviada correctamente");
     } catch (error) {

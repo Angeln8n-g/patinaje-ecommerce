@@ -19,11 +19,11 @@ function parseOrder(row: any) {
 router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    const { customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, items, total, payment_method, shipping_lat, shipping_lng } = req.body;
+    const { customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, items, total, payment_method, shipping_lat, shipping_lng, fiscal_data } = req.body;
     const result = await query(
-      `INSERT INTO skating_orders (user_id, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, items, total, payment_method, shipping_lat, shipping_lng)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [userId, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, JSON.stringify(items), total, payment_method || 'card', shipping_lat, shipping_lng]
+      `INSERT INTO skating_orders (user_id, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, items, total, payment_method, shipping_lat, shipping_lng, fiscal_data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [userId, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, JSON.stringify(items), total, payment_method || 'card', shipping_lat, shipping_lng, fiscal_data ? JSON.stringify(fiscal_data) : null]
     );
     res.status(201).json(parseOrder(result.rows[0]));
   } catch (err) {
