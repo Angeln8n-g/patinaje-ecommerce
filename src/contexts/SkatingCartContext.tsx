@@ -116,7 +116,12 @@ export function SkatingCartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+  const total = items.reduce((sum, i) => {
+    const price = i.selectedVariant && i.product.variant_prices && i.product.variant_prices[i.selectedVariant] != null
+      ? i.product.variant_prices[i.selectedVariant]
+      : i.product.price;
+    return sum + price * i.quantity;
+  }, 0);
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (

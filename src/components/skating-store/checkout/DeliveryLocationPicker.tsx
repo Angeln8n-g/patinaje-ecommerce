@@ -82,6 +82,10 @@ interface DeliveryLocationPickerProps {
   disabled?: boolean;
   /** Coordinates from address geocoding — positions the pin without reverse geocoding */
   externalCoords?: { lat: number; lng: number } | null;
+  /** When true, allow location selection even without active delivery zones */
+  allowWithoutZones?: boolean;
+  /** When true, out-of-zone shipping is enabled (charges apply) */
+  outOfZoneEnabled?: boolean;
 }
 
 /** Reverse geocode coordinates to an address string using Nominatim. */
@@ -111,6 +115,8 @@ export default function DeliveryLocationPicker({
   onAddressResolve,
   disabled,
   externalCoords,
+  allowWithoutZones,
+  outOfZoneEnabled,
 }: DeliveryLocationPickerProps) {
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
   const [selectedLng, setSelectedLng] = useState<number | null>(null);
@@ -149,14 +155,20 @@ export default function DeliveryLocationPicker({
       setValidationResult(null);
 
       try {
-        const result = await validateDeliveryZone(lat, lng);
-        setValidationResult(result);
-        onLocationChange({
-          lat,
-          lng,
-          inZone: result.inZone,
-          zoneName: result.inZone ? result.zoneName : undefined,
-        });
+        // If no active zones exist but sales are allowed, skip zone validation
+        if (hasActiveZones === false && allowWithoutZones) {
+          setValidationResult({ inZone: true });
+          onLocationChange({ lat, lng, inZone: true });
+        } else {
+          const result = await validateDeliveryZone(lat, lng);
+          setValidationResult(result);
+          onLocationChange({
+            lat,
+            lng,
+            inZone: result.inZone,
+            zoneName: result.inZone ? result.zoneName : undefined,
+          });
+        }
       } catch {
         setValidationResult(null);
         onLocationChange({ lat, lng, inZone: true });
@@ -217,7 +229,7 @@ export default function DeliveryLocationPicker({
     selectPoint(externalCoords.lat, externalCoords.lng, false);
   }, [externalCoords, selectPoint]);
 
-  if (hasActiveZones === false) return null;
+  if (hasActiveZones === false && !allowWithoutZones) return null;
 
   if (hasActiveZones === null) {
     return (
@@ -227,6 +239,8 @@ export default function DeliveryLocationPicker({
       </div>
     );
   }
+
+  const noZonesButAllowed = hasActiveZones === false && allowWithoutZones;
 
   return (
     <div className="space-y-3">
@@ -252,7 +266,10 @@ export default function DeliveryLocationPicker({
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Haz clic en el mapa, usa tu ubicación GPS, o escribe tu dirección arriba. Las zonas de entrega están marcadas en azul.
+        {noZonesButAllowed
+          ? "Haz clic en el mapa, usa tu ubicación GPS, o escribe tu dirección arriba para calcular el costo de envío."
+          : "Haz clic en el mapa, usa tu ubicación GPS, o escribe tu dirección arriba. Las zonas de entrega están marcadas en azul."
+        }
       </p>
 
       <div className="h-[280px] w-full rounded-lg overflow-hidden border">
@@ -288,7 +305,9 @@ export default function DeliveryLocationPicker({
               <Popup>
                 <div className="p-1 text-center">
                   <p className="font-semibold text-sm">
-                    {validationResult?.inZone ? "✓ Dentro de zona" : validationResult !== null ? "✗ Fuera de zona" : "Verificando..."}
+                    {validationResult?.inZone
+                      ? (noZonesButAllowed ? "✓ Ubicación seleccionada" : "✓ Dentro de zona")
+                      : validationResult !== null ? "✗ Fuera de zona" : "Verificando..."}
                   </p>
                 </div>
               </Popup>
@@ -311,15 +330,20 @@ export default function DeliveryLocationPicker({
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-700">
-                ¡Ubicación dentro de la zona de entrega
-                {validationResult.zoneName ? ` "${validationResult.zoneName}"` : ""}!
+                {noZonesButAllowed
+                  ? "Ubicación seleccionada. El costo de envío se calculará por distancia."
+                  : `¡Ubicación dentro de la zona de entrega${validationResult.zoneName ? ` "${validationResult.zoneName}"` : ""}!`
+                }
               </AlertDescription>
             </Alert>
           ) : (
             <Alert className="border-amber-200 bg-amber-50">
               <XCircle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-amber-700">
-                Esta ubicación está fuera de la zona de entrega. Mueve el pin dentro de las áreas marcadas en azul.
+                Esta ubicación está fuera de la zona de entrega. {outOfZoneEnabled
+                  ? "Se aplicarán cargos adicionales por distancia."
+                  : "Mueve el pin dentro de las áreas marcadas en azul."
+                }
               </AlertDescription>
             </Alert>
           )}

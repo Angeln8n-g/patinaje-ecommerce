@@ -1,7 +1,7 @@
 import { getProductByIdServer, getProductReviewsServer } from "@/lib/skating-store/product-queries";
 import { getProductsServer } from "@/lib/skating-store/product-queries";
 import { ProductGallery } from "@/components/skating-store/products/ProductGallery";
-import { ProductActions } from "@/components/skating-store/products/ProductActions";
+import { ProductActions, getVariantPrice } from "@/components/skating-store/products/ProductActions";
 import { ProductReviews } from "@/components/skating-store/products/ProductReviews";
 import { notFound } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
@@ -58,7 +58,20 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
 
             <div className="flex items-center gap-3 mb-2">
-              <div className="text-4xl font-extrabold">{formatCurrency(product.price)}</div>
+              {product.variant_prices && Object.keys(product.variant_prices).length > 0 ? (() => {
+                const prices = Object.values(product.variant_prices as Record<string, number>);
+                const minPrice = Math.min(...prices);
+                const maxPrice = Math.max(...prices);
+                return minPrice === maxPrice ? (
+                  <div className="text-4xl font-extrabold">{formatCurrency(minPrice)}</div>
+                ) : (
+                  <div className="text-4xl font-extrabold">
+                    {formatCurrency(minPrice)} <span className="text-2xl text-muted-foreground font-medium">–</span> {formatCurrency(maxPrice)}
+                  </div>
+                );
+              })() : (
+                <div className="text-4xl font-extrabold">{formatCurrency(product.price)}</div>
+              )}
             </div>
           </div>
           

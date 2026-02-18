@@ -8,6 +8,8 @@ export interface Category {
   created_at: string;
 }
 
+export type PromoStatus = 'none' | 'upcoming' | 'active' | 'expired';
+
 export interface Banner {
   id: string;
   title: string;
@@ -16,9 +18,27 @@ export interface Banner {
   link_url?: string;
   active: boolean;
   display_order: number;
+  promo_status?: PromoStatus;
+  promo_start_date?: string;
+  promo_end_date?: string;
   created_at: string;
   category_ids?: string[];   // IDs de categorías asociadas
   categories?: Category[];   // Categorías populadas (para admin)
+  waitlist_count?: number;
+  notified_count?: number;
+}
+
+export interface PromoWaitlistEntry {
+  id: string;
+  banner_id: string;
+  user_id?: string;
+  email: string;
+  name?: string;
+  notified: boolean;
+  notified_at?: string;
+  created_at: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export interface PromoTextBanner {
@@ -57,6 +77,7 @@ export interface Product {
   status: 'active' | 'inactive';
   variant_type?: 'none' | 'size' | 'measurement';
   variant_options?: string[];
+  variant_prices?: Record<string, number>;
   created_at: string;
   updated_at: string;
 }
@@ -183,6 +204,7 @@ export interface ShippingConfig {
   cost_per_extra_km: number;
   max_distance_km: number;
   out_of_zone_enabled: boolean;
+  allow_sales_without_zones?: boolean;
 }
 
 export type ShippingZoneType = "within_zone" | "out_of_zone" | "out_of_range";

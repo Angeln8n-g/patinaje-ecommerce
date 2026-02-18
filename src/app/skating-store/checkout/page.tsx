@@ -9,6 +9,7 @@ import { generateAndSendInvoice, sendProformaInvoice } from "@/lib/skating-store
 import { sendOrderNotification, sendAdminNewOrderEmail } from "@/lib/skating-store/notification-actions";
 import { createInAppNotification, notifyAdminsNewOrder } from "@/lib/skating-store/in-app-notifications";
 import { ShippingInfo } from "@/types/skating-store";
+import type { FiscalData } from "@/components/skating-store/checkout/FiscalInvoiceModal";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +18,7 @@ export default function CheckoutPage() {
   const { items, total, clearCart } = useSkatingCart();
   const [isLoading, setIsLoading] = useState(false);
   const [shippingCost, setShippingCost] = useState(0);
+  const [isWithinFreeZone, setIsWithinFreeZone] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
   const [initialValues, setInitialValues] = useState<Partial<ShippingInfo> | undefined>(undefined);
@@ -42,7 +44,7 @@ export default function CheckoutPage() {
     loadProfile();
   }, [user]);
 
-  const handleCheckout = async (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }, shippingTotal: number) => {
+  const handleCheckout = async (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }, shippingTotal: number, fiscalData?: FiscalData) => {
     setIsLoading(true);
     try {
       if (!user) {
@@ -79,6 +81,7 @@ export default function CheckoutPage() {
         shippingCost: shippingTotal,
         total: finalTotal,
         paymentMethod: data.paymentMethod,
+        fiscalData: fiscalData || null,
       };
       
       try {
@@ -181,10 +184,11 @@ export default function CheckoutPage() {
                 disabled={!user}
                 onLogin={() => router.push("/login")}
                 onShippingCostChange={setShippingCost}
+                onShippingZoneChange={setIsWithinFreeZone}
               />
             </div>
             <div>
-              <OrderSummary shippingCost={shippingCost} />
+              <OrderSummary shippingCost={shippingCost} isWithinFreeZone={isWithinFreeZone} />
             </div>
           </div>
         </>

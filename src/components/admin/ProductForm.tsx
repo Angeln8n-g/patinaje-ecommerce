@@ -37,6 +37,7 @@ const formSchema = z.object({
   barcode: z.string().optional(),
   variant_type: z.enum(["none", "size", "measurement"]),
   variant_options: z.array(z.string()),
+  variant_prices: z.record(z.string(), z.number()).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -68,6 +69,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       barcode: initialData?.barcode || generateBarcode(),
       variant_type: initialData?.variant_type || "none",
       variant_options: initialData?.variant_options || [],
+      variant_prices: initialData?.variant_prices || {},
     },
   });
 
@@ -109,6 +111,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
     const currentVariants = form.getValues("variant_options");
     if (!currentVariants.includes(variantInput)) {
       form.setValue("variant_options", [...currentVariants, variantInput]);
+      // Initialize price for new variant with the base price
+      const currentPrices = form.getValues("variant_prices") || {};
+      form.setValue("variant_prices", { ...currentPrices, [variantInput]: form.getValues("price") });
     }
     setVariantInput("");
   };
@@ -116,6 +121,15 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const removeVariant = (option: string) => {
     const currentVariants = form.getValues("variant_options");
     form.setValue("variant_options", currentVariants.filter(v => v !== option));
+    // Remove price for this variant
+    const currentPrices = { ...(form.getValues("variant_prices") || {}) };
+    delete currentPrices[option];
+    form.setValue("variant_prices", currentPrices);
+  };
+
+  const updateVariantPrice = (option: string, price: number) => {
+    const currentPrices = form.getValues("variant_prices") || {};
+    form.setValue("variant_prices", { ...currentPrices, [option]: price });
   };
 
   const currentVariantType = form.watch("variant_type");
@@ -399,16 +413,27 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 name="variant_options"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="flex flex-col gap-3 mt-2">
                       {field.value.map((option, index) => (
-                        <div key={index} className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium border border-primary/20">
-                          <span>{option}</span>
+                        <div key={index} className="flex items-center gap-2 bg-muted/50 p-3 rounded-lg border">
+                          <span className="font-medium text-sm min-w-[4rem]">{option}</span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <span className="text-xs text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              className="w-28 h-8 text-sm"
+                              value={form.watch("variant_prices")?.[option] ?? form.watch("price") ?? 0}
+                              onChange={(e) => updateVariantPrice(option, parseFloat(e.target.value) || 0)}
+                              placeholder="Precio"
+                            />
+                          </div>
                           <button
                             type="button"
                             onClick={() => removeVariant(option)}
-                            className="hover:text-destructive transition-colors ml-1"
+                            className="hover:text-destructive transition-colors ml-2"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
                       ))}

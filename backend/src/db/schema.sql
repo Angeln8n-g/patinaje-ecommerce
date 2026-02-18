@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS skating_products (
   status VARCHAR(20) DEFAULT 'active',
   variant_type VARCHAR(20) DEFAULT 'none',
   variant_options TEXT[] DEFAULT '{}',
+  variant_prices JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

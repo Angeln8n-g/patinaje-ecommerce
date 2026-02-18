@@ -60,8 +60,9 @@ router.get("/banners", async (req, res) => {
     }
 
     // Case 2: Active banners only (storefront / carousel principal)
+    // Also include upcoming promos so users can subscribe
     if (activeOnly) {
-      const sql = "SELECT * FROM banners WHERE active = TRUE ORDER BY display_order ASC";
+      const sql = "SELECT * FROM banners WHERE active = TRUE OR promo_status = 'upcoming' ORDER BY display_order ASC";
       const result = await query(sql);
       return res.json(result.rows);
     }

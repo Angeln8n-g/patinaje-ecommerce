@@ -67,6 +67,8 @@ DATABASE_URL=postgresql://skating_user:TU_PASSWORD_SEGURO@localhost:5432/skating
 JWT_SECRET=07a9ca8c0f41aa67912f79127bf67e82ca45512db2b7f2a8fbf3633bda02ab96873a3f73ed48a116654774dc2886c8ba44a254f4111d36409451857481e87d8b
 PORT=4000
 CORS_ORIGIN=https://hunykho.com,https://trae-patinaje-ecommerce-apa9.vercel.app
+RESEND_API_KEY=re_XXXXXXXX
+STORE_URL=https://hunykho.com
 ```
 
 ## 7. Inicializar la base de datos
@@ -89,6 +91,8 @@ Migraciones actuales:
 - `001_oauth_and_reset.sql` — OAuth y reset de contraseña
 - `002_fiscal_module.sql` — Módulo fiscal (config, secuencias, facturas, auditoría)
 - `003_banner_categories.sql` — Relación banners-categorías
+- `004_variant_prices.sql` — Precios por variante de producto
+- `005_promo_waitlist.sql` — Sistema de lista de espera para promociones (promo_status en banners + tabla promo_waitlist)
 
 > Para futuras actualizaciones con cambios de base de datos:
 > ```bash

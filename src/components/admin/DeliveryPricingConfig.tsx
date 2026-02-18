@@ -42,6 +42,7 @@ export default function DeliveryPricingConfig() {
   const [costPerExtraKm, setCostPerExtraKm] = useState("");
   const [maxDistance, setMaxDistance] = useState("");
   const [outOfZoneEnabled, setOutOfZoneEnabled] = useState(false);
+  const [allowSalesWithoutZones, setAllowSalesWithoutZones] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,7 @@ export default function DeliveryPricingConfig() {
           setCostPerExtraKm(String(config.cost_per_extra_km));
           setMaxDistance(String(config.max_distance_km));
           setOutOfZoneEnabled(config.out_of_zone_enabled);
+          setAllowSalesWithoutZones(config.allow_sales_without_zones ?? false);
         }
 
         // Also load store location for map center
@@ -110,6 +112,12 @@ export default function DeliveryPricingConfig() {
     setSuccess(null);
   };
 
+  const handleToggleAllowSalesWithoutZones = (enabled: boolean) => {
+    setAllowSalesWithoutZones(enabled);
+    setError(null);
+    setSuccess(null);
+  };
+
   // Validate and save
   const handleSave = async () => {
     setError(null);
@@ -132,6 +140,7 @@ export default function DeliveryPricingConfig() {
       cost_per_extra_km: costPerExtraKmNum,
       max_distance_km: maxDistanceNum,
       out_of_zone_enabled: outOfZoneEnabled,
+      allow_sales_without_zones: allowSalesWithoutZones,
     };
 
     const validation = validateShippingConfig(config);
@@ -318,13 +327,28 @@ export default function DeliveryPricingConfig() {
           <div className="space-y-0.5">
             <Label htmlFor="out-of-zone-enabled">Habilitar envíos fuera de zona</Label>
             <p className="text-xs text-muted-foreground">
-              Permitir envíos entre el radio base y la distancia máxima
+              Permitir envíos entre el radio base y la distancia máxima, aplicando cargos adicionales por km
             </p>
           </div>
           <Switch
             id="out-of-zone-enabled"
             checked={outOfZoneEnabled}
             onCheckedChange={handleToggleOutOfZone}
+          />
+        </div>
+
+        {/* ── Allow sales without zones toggle ───────────────────── */}
+        <div className="flex items-center justify-between py-2 border-t">
+          <div className="space-y-0.5">
+            <Label htmlFor="allow-sales-without-zones">Permitir ventas sin zonas de entrega</Label>
+            <p className="text-xs text-muted-foreground">
+              Permite realizar ventas aunque no haya zonas de entrega configuradas o activas. El costo de envío se calcula por distancia.
+            </p>
+          </div>
+          <Switch
+            id="allow-sales-without-zones"
+            checked={allowSalesWithoutZones}
+            onCheckedChange={handleToggleAllowSalesWithoutZones}
           />
         </div>
 

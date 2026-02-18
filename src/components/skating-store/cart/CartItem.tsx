@@ -41,7 +41,11 @@ export function CartItem({ item, editable = true }: CartItemProps) {
               {product.variant_type === 'size' ? 'Talla' : 'Medida'}: {item.selectedVariant}
             </div>
           )}
-          <p className="font-extrabold text-xl">{formatCurrency(product.price)}</p>
+          <p className="font-extrabold text-xl">{formatCurrency(
+            item.selectedVariant && product.variant_prices && product.variant_prices[item.selectedVariant] != null
+              ? product.variant_prices[item.selectedVariant]
+              : product.price
+          )}</p>
         </div>
         
         {editable && (

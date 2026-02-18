@@ -233,7 +233,10 @@ export default function OrderTrackingPage() {
             </Card>
             <Card className="shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><Package className="h-5 w-5 text-muted-foreground" />Resumen del Pedido</CardTitle></CardHeader>
               <CardContent><div className="space-y-3">
-                {order.items.map((item, idx) => (<div key={idx} className="flex justify-between text-sm"><span className="text-muted-foreground"><span className="font-bold text-foreground">{item.quantity}x</span> {item.product.name}</span><span className="font-medium">{formatCurrency(item.product.price * item.quantity)}</span></div>))}
+                {order.items.map((item, idx) => {
+                  const itemPrice = item.selectedVariant && item.product.variant_prices && item.product.variant_prices[item.selectedVariant] != null ? item.product.variant_prices[item.selectedVariant] : item.product.price;
+                  return (<div key={idx} className="flex justify-between text-sm"><span className="text-muted-foreground"><span className="font-bold text-foreground">{item.quantity}x</span> {item.product.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''}</span><span className="font-medium">{formatCurrency(itemPrice * item.quantity)}</span></div>);
+                })}
                 <div className="pt-3 border-t flex justify-between items-center font-bold text-lg"><span>Total</span><span className="text-primary">{formatCurrency(order.total)}</span></div>
                 <div className="pt-2"><Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted font-medium">Método: {order.payment_method === "cash" ? "Efectivo" : "Tarjeta"}</Badge></div>
               </div></CardContent>

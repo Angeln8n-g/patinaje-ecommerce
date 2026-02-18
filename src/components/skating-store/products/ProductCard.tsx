@@ -119,10 +119,25 @@ export function ProductCard({ product }: ProductCardProps) {
           <h3 className="font-bold text-base line-clamp-2 mb-2 min-h-[3rem]">{product.name}</h3>
           
           <div className="flex items-baseline gap-2">
-            <span className="font-extrabold text-lg text-primary">{formatCurrency(product.price)}</span>
-            <span className="text-sm text-muted-foreground line-through decoration-muted-foreground/50">
-              {formatCurrency(previousPrice)}
-            </span>
+            {product.variant_prices && Object.keys(product.variant_prices).length > 0 ? (() => {
+              const prices = Object.values(product.variant_prices as Record<string, number>);
+              const minPrice = Math.min(...prices);
+              const maxPrice = Math.max(...prices);
+              return minPrice === maxPrice ? (
+                <span className="font-extrabold text-lg text-primary">{formatCurrency(minPrice)}</span>
+              ) : (
+                <span className="font-extrabold text-lg text-primary">
+                  {formatCurrency(minPrice)} – {formatCurrency(maxPrice)}
+                </span>
+              );
+            })() : (
+              <>
+                <span className="font-extrabold text-lg text-primary">{formatCurrency(product.price)}</span>
+                <span className="text-sm text-muted-foreground line-through decoration-muted-foreground/50">
+                  {formatCurrency(previousPrice)}
+                </span>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

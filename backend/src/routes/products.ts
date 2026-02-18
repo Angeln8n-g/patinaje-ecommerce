@@ -14,6 +14,7 @@ function parseProduct(row: any) {
     stock: row.stock != null ? parseInt(row.stock) : 0,
     images: Array.isArray(row.images) ? row.images : [],
     variant_options: Array.isArray(row.variant_options) ? row.variant_options : [],
+    variant_prices: row.variant_prices && typeof row.variant_prices === 'object' ? row.variant_prices : {},
   };
 }
 
@@ -99,12 +100,12 @@ router.get("/:id", async (req, res) => {
 // POST /api/products — admin only
 router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, status, subcategory, unit_type, supplier, purchase_price } = req.body;
+    const { name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, status, subcategory, unit_type, supplier, purchase_price } = req.body;
     const result = await query(
-      `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, status, subcategory, unit_type, supplier, purchase_price)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, status, subcategory, unit_type, supplier, purchase_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
-      [name, description, price, category, images || [], stock || 0, featured || false, barcode, variant_type || 'none', variant_options || [], status || 'active', subcategory, unit_type, supplier, purchase_price]
+      [name, description, price, category, images || [], stock || 0, featured || false, barcode, variant_type || 'none', variant_options || [], JSON.stringify(variant_prices || {}), status || 'active', subcategory, unit_type, supplier, purchase_price]
     );
     res.status(201).json(parseProduct(result.rows[0]));
   } catch (err: any) {
@@ -136,8 +137,8 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
           continue;
         }
         const result = await query(
-          `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, status, subcategory, unit_type, supplier, purchase_price)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, status, subcategory, unit_type, supplier, purchase_price)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
            RETURNING *`,
           [
             p.name,
@@ -150,6 +151,7 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
             p.barcode || null,
             p.variant_type || "none",
             p.variant_options || [],
+            JSON.stringify(p.variant_prices || {}),
             p.status || "active",
             p.subcategory || null,
             p.unit_type || null,
@@ -182,11 +184,11 @@ router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res)
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
-    const allowed = ["name", "description", "price", "category", "images", "stock", "featured", "barcode", "variant_type", "variant_options", "status", "subcategory", "unit_type", "supplier", "purchase_price"];
+    const allowed = ["name", "description", "price", "category", "images", "stock", "featured", "barcode", "variant_type", "variant_options", "variant_prices", "status", "subcategory", "unit_type", "supplier", "purchase_price"];
     for (const key of allowed) {
       if (fields[key] !== undefined) {
         sets.push(key + " = $" + (idx++));
-        params.push(fields[key]);
+        params.push(key === 'variant_prices' ? JSON.stringify(fields[key]) : fields[key]);
       }
     }
     if (sets.length === 0) { res.status(400).json({ error: "No hay campos para actualizar" }); return; }

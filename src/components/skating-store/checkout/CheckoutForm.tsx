@@ -13,10 +13,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button as UIButton } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Banknote, Loader2 } from "lucide-react";
+import { CreditCard, Banknote, Loader2, FileText } from "lucide-react";
 import type { DeliveryLocationResult } from "./DeliveryLocationPicker";
 import { ShippingBreakdown } from "./ShippingBreakdown";
-import { calculateShippingCost } from "@/lib/skating-store/shipping-actions";
+import { calculateShippingCost, getShippingConfig } from "@/lib/skating-store/shipping-actions";
+import { FiscalInvoiceModal, type FiscalData } from "./FiscalInvoiceModal";
 
 const DeliveryLocationPicker = dynamic(
   () => import("./DeliveryLocationPicker"),
@@ -41,12 +42,13 @@ const formSchema = z.object({
 });
 
 interface CheckoutFormProps {
-  onSubmit: (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }, shippingTotal: number) => Promise<void>;
+  onSubmit: (data: ShippingInfo & { paymentMethod: 'card' | 'cash' }, shippingTotal: number, fiscalData?: FiscalData) => Promise<void>;
   isLoading: boolean;
   initialValues?: Partial<ShippingInfo>;
   disabled?: boolean;
   onLogin?: () => void;
   onShippingCostChange?: (cost: number) => void;
+  onShippingZoneChange?: (isWithinFreeZone: boolean) => void;
 }
 
 /** Geocode an address string to coordinates using Nominatim. */
@@ -67,7 +69,7 @@ async function geocodeAddress(address: string, city: string): Promise<{ lat: num
   }
 }
 
-export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onLogin, onShippingCostChange }: CheckoutFormProps) {
+export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onLogin, onShippingCostChange, onShippingZoneChange }: CheckoutFormProps) {
   // Delivery location from map (click, GPS, or address geocode)
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocationResult | null>(null);
 
@@ -78,6 +80,16 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
   const [shippingCost, setShippingCost] = useState<ShippingCostResult | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+
+  // Fiscal invoice state
+  const [wantsFiscalInvoice, setWantsFiscalInvoice] = useState(false);
+  const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
+  const [fiscalData, setFiscalData] = useState<FiscalData | null>(null);
+
+  // Shipping config state (for allow_sales_without_zones and out_of_zone_enabled)
+  const [allowSalesWithoutZones, setAllowSalesWithoutZones] = useState(false);
+  const [outOfZoneEnabled, setOutOfZoneEnabled] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   // Track whether the map set the address (to avoid re-geocoding loop)
   const mapSetAddress = useRef(false);
@@ -97,6 +109,24 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
 
   const addressValue = form.watch("address");
   const cityValue = form.watch("city");
+
+  // Load shipping config to know if sales without zones are allowed
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const config = await getShippingConfig();
+        if (config) {
+          setAllowSalesWithoutZones(config.allow_sales_without_zones ?? false);
+          setOutOfZoneEnabled(config.out_of_zone_enabled ?? false);
+        }
+      } catch {
+        // Config not available, keep defaults
+      } finally {
+        setConfigLoaded(true);
+      }
+    }
+    loadConfig();
+  }, []);
 
   // When user types address+city, geocode and send coords to map
   useEffect(() => {
@@ -130,10 +160,12 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
             setShippingCost(result.data);
             setShippingError(null);
             onShippingCostChange?.(result.data.total_cost);
+            onShippingZoneChange?.(result.data.zone_type === "within_zone" && result.data.total_cost === 0);
           } else {
             setShippingCost(null);
             setShippingError(result.error);
             onShippingCostChange?.(0);
+            onShippingZoneChange?.(false);
           }
         } catch {
           setShippingCost(null);
@@ -146,6 +178,7 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
         setShippingCost(null);
         setShippingError(null);
         onShippingCostChange?.(0);
+        onShippingZoneChange?.(false);
       }
     }
     calculate();
@@ -169,13 +202,30 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
     (shippingCost.zone_type === "out_of_zone" && !shippingCost.out_of_zone_enabled)
   );
 
+  // When out_of_zone_enabled is true, being outside the polygon is OK (shipping charges apply)
+  // When allow_sales_without_zones is true, not having a location is OK (no map/zones needed)
+  const canSubmit = (() => {
+    if (isLoading || shippingLoading) return false;
+    // If shipping cost was calculated and it's blocked, can't submit
+    if (isShippingBlocked) return false;
+    // If there's a location selected
+    if (deliveryLocation) {
+      // Outside zone polygon but out_of_zone shipping is enabled → OK (cost will be calculated)
+      if (isOutsideZone && !outOfZoneEnabled) return false;
+      return true;
+    }
+    // No location selected: only allow if sales without zones is enabled
+    if (allowSalesWithoutZones) return true;
+    return false;
+  })();
+
   const handleFormSubmit = async (data: z.infer<typeof formSchema>) => {
     const shippingData: ShippingInfo & { paymentMethod: 'card' | 'cash' } = {
       ...data,
       lat: deliveryLocation?.lat,
       lng: deliveryLocation?.lng,
     };
-    await onSubmit(shippingData, shippingCost?.total_cost ?? 0);
+    await onSubmit(shippingData, shippingCost?.total_cost ?? 0, wantsFiscalInvoice && fiscalData ? fiscalData : undefined);
   };
 
   return (
@@ -236,6 +286,8 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
             onAddressResolve={handleAddressResolve}
             disabled={disabled}
             externalCoords={geocodedCoords}
+            allowWithoutZones={allowSalesWithoutZones}
+            outOfZoneEnabled={outOfZoneEnabled}
           />
         </div>
 
@@ -299,11 +351,64 @@ export function CheckoutForm({ onSubmit, isLoading, initialValues, disabled, onL
         </div>
 
         {!disabled && (
+          <div className="pt-4 border-t">
+            <h3 className="text-lg font-semibold mb-3">Comprobante Fiscal</h3>
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="wantsFiscal"
+                checked={wantsFiscalInvoice}
+                onChange={(e) => {
+                  setWantsFiscalInvoice(e.target.checked);
+                  if (e.target.checked && !fiscalData) {
+                    setFiscalModalOpen(true);
+                  }
+                }}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="wantsFiscal" className="cursor-pointer">
+                ¿Desea comprobante fiscal?
+              </Label>
+            </div>
+            {wantsFiscalInvoice && fiscalData && (
+              <div className="mt-3 p-3 bg-muted rounded-md text-sm space-y-1">
+                <div className="flex items-center gap-2 font-medium">
+                  <FileText className="h-4 w-4" />
+                  Datos fiscales registrados
+                </div>
+                <p><span className="text-muted-foreground">Nombre:</span> {fiscalData.nombre}</p>
+                {fiscalData.rnc && <p><span className="text-muted-foreground">RNC/Cédula:</span> {fiscalData.rnc}</p>}
+                <p><span className="text-muted-foreground">Tipo:</span> {fiscalData.tipoComprador === "persona_juridica" ? "Persona Jurídica" : fiscalData.tipoComprador === "persona_fisica" ? "Persona Física" : "Consumidor Final"}</p>
+                <p><span className="text-muted-foreground">Comprobante:</span> {fiscalData.tipoComprobante === "31" ? "Crédito Fiscal (31)" : "Consumo (32)"}</p>
+                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setFiscalModalOpen(true)}>
+                  Editar datos fiscales
+                </Button>
+              </div>
+            )}
+            {wantsFiscalInvoice && !fiscalData && (
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setFiscalModalOpen(true)}>
+                <FileText className="h-4 w-4 mr-2" />
+                Completar datos fiscales
+              </Button>
+            )}
+          </div>
+        )}
+
+        <FiscalInvoiceModal
+          open={fiscalModalOpen}
+          onOpenChange={setFiscalModalOpen}
+          onConfirm={(data) => {
+            setFiscalData(data);
+            setFiscalModalOpen(false);
+          }}
+        />
+
+        {!disabled && (
           <Button
             type="submit"
             className="w-full mt-6"
             size="lg"
-            disabled={isLoading || isOutsideZone || noLocation || isShippingBlocked || shippingLoading}
+            disabled={!canSubmit}
           >
             {isLoading ? "Procesando..." : "Confirmar Pedido"}
           </Button>

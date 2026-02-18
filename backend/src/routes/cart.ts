@@ -34,6 +34,7 @@ router.get("/", requireAuth, async (req, res) => {
         price: parseFloat(row.price), category: row.category, images: row.images,
         stock: row.stock, featured: row.featured, barcode: row.barcode,
         variant_type: row.variant_type, variant_options: row.variant_options,
+        variant_prices: row.variant_prices && typeof row.variant_prices === 'object' ? row.variant_prices : {},
         status: row.status, created_at: row.created_at, updated_at: row.updated_at,
       },
     }));
