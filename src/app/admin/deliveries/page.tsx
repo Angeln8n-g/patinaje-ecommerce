@@ -30,6 +30,39 @@ function timeAgo(dateStr: string): { text: string; isOnline: boolean } {
   return { text: `Hace ${days}d`, isOnline: false };
 }
 
+// Moto SVG icon component with status color
+function MotoIcon({ status, className = "" }: { status: "online" | "busy" | "offline"; className?: string }) {
+  const colors = { online: "#22c55e", busy: "#eab308", offline: "#ef4444" };
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" className={`h-5 w-5 ${className}`}>
+      <circle cx="20" cy="20" r="18" fill={colors[status]} stroke="#fff" strokeWidth="2" opacity="0.9"/>
+      <g transform="translate(8,10) scale(0.055)" fill="#fff">
+        <path d="M400 192h-75.67L289.6 73.6A48 48 0 0 0 244.53 48H179.2a48 48 0 0 0-45.07 25.6L99.67 192H24a24 24 0 0 0-24 24v48a24 24 0 0 0 24 24h8.27A80 80 0 1 0 176 272h72a80 80 0 1 0 143.73 16H400a24 24 0 0 0 24-24v-48a24 24 0 0 0-24-24zM96 336a48 48 0 1 1 48-48 48 48 0 0 1-48 48zm232 0a48 48 0 1 1 48-48 48 48 0 0 1-48 48z"/>
+      </g>
+    </svg>
+  );
+}
+
+function getDriverStatus(updatedAt: string, activeShipments: number): "online" | "busy" | "offline" {
+  const diffMs = Date.now() - new Date(updatedAt).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins >= 5) return "offline";
+  if (activeShipments > 0) return "busy";
+  return "online";
+}
+
+const DRIVER_STATUS_LABELS: Record<string, string> = {
+  online: "Activo",
+  busy: "En movimiento",
+  offline: "Desconectado",
+};
+
+const DRIVER_STATUS_TEXT_COLORS: Record<string, string> = {
+  online: "text-green-600",
+  busy: "text-yellow-600",
+  offline: "text-red-500",
+};
+
 export default function DeliveriesPage() {
   const [deliveryMen, setDeliveryMen] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -207,19 +240,21 @@ export default function DeliveriesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {connection ? (
+                        {loc ? (() => {
+                          const driverStatus = getDriverStatus(loc.updated_at, dm.activeShipments || 0);
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <MotoIcon status={driverStatus} />
+                              <span className={cn("text-xs font-medium", DRIVER_STATUS_TEXT_COLORS[driverStatus])}>
+                                {DRIVER_STATUS_LABELS[driverStatus]}
+                              </span>
+                            </div>
+                          );
+                        })() : (
                           <div className="flex items-center gap-1.5">
-                            {connection.isOnline ? (
-                              <Wifi className="h-3.5 w-3.5 text-green-500" />
-                            ) : (
-                              <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                            <span className={cn("text-xs font-medium", connection.isOnline ? "text-green-600" : "text-muted-foreground")}>
-                              {connection.text}
-                            </span>
+                            <MotoIcon status="offline" />
+                            <span className="text-xs text-muted-foreground">Sin ubicación</span>
                           </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sin ubicación</span>
                         )}
                       </TableCell>
                       <TableCell>

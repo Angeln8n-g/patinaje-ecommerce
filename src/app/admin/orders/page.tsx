@@ -24,6 +24,11 @@ const OrdersMap = dynamic(() => import("@/components/admin/OrdersMap"), {
   loading: () => <div className="h-[500px] w-full flex items-center justify-center bg-muted rounded-lg border">Cargando mapa...</div>,
 });
 
+const DeliveryAssignmentMap = dynamic(() => import("@/components/admin/DeliveryAssignmentMap"), {
+  ssr: false,
+  loading: () => <div className="h-[250px] w-full flex items-center justify-center bg-muted rounded-lg border text-sm text-muted-foreground">Cargando mapa...</div>,
+});
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [deliveryMen, setDeliveryMen] = useState<any[]>([]);
@@ -54,6 +59,12 @@ export default function AdminOrdersPage() {
   // Map toggle
   const [showMap, setShowMap] = useState(false);
 
+  // Assignment map toggle
+  const [showAssignMap, setShowAssignMap] = useState(false);
+
+  // Active shipments per delivery man (for moto icon colors)
+  const [activeShipmentsMap, setActiveShipmentsMap] = useState<Record<string, number>>({});
+
   // Fiscal invoice state
   const [fiscalOpen, setFiscalOpen] = useState(false);
   const [fiscalOrderId, setFiscalOrderId] = useState("");
@@ -73,6 +84,15 @@ export default function AdminOrdersPage() {
       setOrders(ordersData || []);
       setDeliveryMen(deliveryMenData || []);
       setSellersList(sellersData || []);
+
+      // Build active shipments map per delivery man
+      const shipmentsCount: Record<string, number> = {};
+      (ordersData || []).forEach((o: any) => {
+        if (o.shipment && o.shipment.delivery_man_id && o.status !== "delivered" && o.status !== "cancelled") {
+          shipmentsCount[o.shipment.delivery_man_id] = (shipmentsCount[o.shipment.delivery_man_id] || 0) + 1;
+        }
+      });
+      setActiveShipmentsMap(shipmentsCount);
       
       // Load store location and nearest delivery men sorted by distance
       const storeLocation = await getStoreLocation();
@@ -296,7 +316,7 @@ export default function AdminOrdersPage() {
                             {order.shipment ? "Reasignar" : "Asignar"}
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-lg">
                           <DialogHeader>
                             <DialogTitle>Asignar Repartidor</DialogTitle>
                           </DialogHeader>
@@ -319,6 +339,26 @@ export default function AdminOrdersPage() {
                                 </AlertDescription>
                               </Alert>
                             )}
+
+                            {/* Map toggle */}
+                            <Button
+                              variant={showAssignMap ? "default" : "outline"}
+                              size="sm"
+                              className="w-full gap-2"
+                              onClick={() => setShowAssignMap(!showAssignMap)}
+                            >
+                              <Map className="h-4 w-4" />
+                              {showAssignMap ? "Ocultar Mapa" : "Ver Repartidores en Mapa"}
+                            </Button>
+
+                            {showAssignMap && (
+                              <DeliveryAssignmentMap
+                                activeShipmentsMap={activeShipmentsMap}
+                                selectedDriverId={selectedDeliveryMan}
+                                onSelectDriver={setSelectedDeliveryMan}
+                              />
+                            )}
+
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Seleccionar Repartidor</label>
                               {nearestDeliveryMen.length > 0 ? (
