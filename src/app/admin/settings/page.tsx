@@ -15,6 +15,7 @@ export default function AdminSettingsPage() {
   const { user, isAdmin } = useAuth();
   const [notifications, setNotifications] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [fiscalEnabled, setFiscalEnabled] = useState(true);
   const [carouselSpeed, setCarouselSpeed] = useState(40); // Default 40s
   const [flashSaleEnd, setFlashSaleEnd] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +30,9 @@ export default function AdminSettingsPage() {
         if (typeof settings.data.flash_sale_end === 'string') {
           setFlashSaleEnd(settings.data.flash_sale_end);
         }
-        // Load other settings if they existed in DB
+        if (typeof settings.data.fiscal_enabled === 'boolean') {
+          setFiscalEnabled(settings.data.fiscal_enabled);
+        }
       }
     });
   }, []);
@@ -39,7 +42,8 @@ export default function AdminSettingsPage() {
     try {
       const updateData: Record<string, unknown> = {
         carousel_speed: carouselSpeed,
-        flash_sale_end: flashSaleEnd
+        flash_sale_end: flashSaleEnd,
+        fiscal_enabled: fiscalEnabled
       };
       
       await updateStaticContentClient('site-settings', updateData);
@@ -107,6 +111,27 @@ export default function AdminSettingsPage() {
             <Switch 
               checked={maintenanceMode} 
               onCheckedChange={setMaintenanceMode} 
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Facturación Fiscal</CardTitle>
+          <CardDescription>Controla el módulo de comprobantes fiscales electrónicos (e-CF).</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between space-x-2">
+            <div className="space-y-0.5">
+              <Label className="text-base">Habilitar Facturación Fiscal</Label>
+              <CardDescription>
+                Al desactivar, se oculta la sección fiscal del panel y se bloquea la emisión de comprobantes. Las órdenes y facturación regular no se ven afectadas.
+              </CardDescription>
+            </div>
+            <Switch
+              checked={fiscalEnabled}
+              onCheckedChange={setFiscalEnabled}
             />
           </div>
         </CardContent>

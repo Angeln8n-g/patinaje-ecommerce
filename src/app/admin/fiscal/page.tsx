@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getFiscalDashboard, getFiscalInvoices } from "@/lib/skating-store/fiscal-actions";
+import { getStaticContentClient } from "@/lib/skating-store/supabase-queries";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, FileText, Settings, List, RefreshCw } from "lucide-react";
+import { Loader2, FileText, Settings, List, RefreshCw, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 
@@ -41,6 +43,8 @@ const ESTADO_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 export default function FiscalDashboardPage() {
+  const router = useRouter();
+  const [fiscalEnabled, setFiscalEnabled] = useState<boolean | null>(null);
   const [dashboard, setDashboard] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +52,17 @@ export default function FiscalDashboardPage() {
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroDesde, setFiltroDesde] = useState("");
   const [filtroHasta, setFiltroHasta] = useState("");
+
+  useEffect(() => {
+    getStaticContentClient('site-settings').then(settings => {
+      if (settings?.data && settings.data.fiscal_enabled === false) {
+        setFiscalEnabled(false);
+        setIsLoading(false);
+      } else {
+        setFiscalEnabled(true);
+      }
+    });
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -71,7 +86,7 @@ export default function FiscalDashboardPage() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { if (fiscalEnabled) loadData(); }, [fiscalEnabled]);
 
   const handleFilter = () => loadData();
 
@@ -79,6 +94,23 @@ export default function FiscalDashboardPage() {
     return (
       <div className="flex justify-center p-10">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (fiscalEnabled === false) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <AlertTriangle className="h-12 w-12 text-muted-foreground" />
+        <h2 className="text-xl font-semibold">Facturación Fiscal Deshabilitada</h2>
+        <p className="text-muted-foreground text-center max-w-md">
+          El módulo de facturación fiscal está desactivado. Puede habilitarlo desde la página de Configuración.
+        </p>
+        <Link href="/admin/settings">
+          <Button variant="outline" className="gap-2">
+            <Settings className="h-4 w-4" /> Ir a Configuración
+          </Button>
+        </Link>
       </div>
     );
   }

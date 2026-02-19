@@ -63,6 +63,19 @@ router.post(
         datos_comprador: DatosComprador;
       };
 
+      // --- 0. Check if fiscal billing is enabled ---
+      const settingsResult = await query(
+        "SELECT data FROM static_content WHERE slug = 'site-settings'"
+      );
+      if (settingsResult.rows.length > 0) {
+        const settings = settingsResult.rows[0].data;
+        const parsed = typeof settings === 'string' ? JSON.parse(settings) : settings;
+        if (parsed?.fiscal_enabled === false) {
+          res.status(403).json({ error: 'La facturación fiscal está deshabilitada. Actívela desde Configuración.' });
+          return;
+        }
+      }
+
       // --- 1. Validate input ---
       if (!order_id) {
         res.status(400).json({ error: 'El campo order_id es requerido' });

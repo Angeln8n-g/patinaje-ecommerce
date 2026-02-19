@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode, UserCheck, Receipt, Bell } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect } from "react";
+import { getStaticContentClient } from "@/lib/skating-store/supabase-queries";
 
 const navItems = [
   {
@@ -89,11 +91,24 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
+  const [fiscalEnabled, setFiscalEnabled] = useState(true);
+
+  useEffect(() => {
+    getStaticContentClient('site-settings').then(settings => {
+      if (settings?.data && typeof settings.data.fiscal_enabled === 'boolean') {
+        setFiscalEnabled(settings.data.fiscal_enabled);
+      }
+    });
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
     router.push("/");
   };
+
+  const filteredNavItems = fiscalEnabled
+    ? navItems
+    : navItems.filter(item => item.href !== "/admin/fiscal");
 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-card px-3 py-4">
@@ -102,7 +117,7 @@ export function Sidebar() {
       </div>
       
       <div className="flex-1 space-y-1">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <Link key={item.href} href={item.href}>
             <span
               className={cn(
