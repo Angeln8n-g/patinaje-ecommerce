@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Shipment, ShipmentStatus } from "@/types/skating-store";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,11 @@ import { BarcodeScanner } from "@/components/admin/BarcodeScanner";
 import { cn } from "@/lib/utils";
 import { mapDbOrderToOrder } from "@/lib/skating-store/supabase-queries";
 import { createInAppNotification } from "@/lib/skating-store/in-app-notifications";
+
+const DeliveryPointMap = dynamic(() => import("@/components/delivery/DeliveryPointMap"), {
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-xl border text-xs text-muted-foreground">Cargando mapa...</div>,
+});
 
 interface ShipmentCardProps {
   shipment: any; // Using any for now to handle joined data easily
@@ -237,6 +243,16 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
               </span>
             </div>
           </div>
+
+          {/* Delivery point map */}
+          {!isHistory && shipping.lat && shipping.lng && (
+            <DeliveryPointMap
+              deliveryLat={shipping.lat}
+              deliveryLng={shipping.lng}
+              customerName={shipping.fullName}
+              address={`${shipping.address}, ${shipping.city}`}
+            />
+          )}
         </CardContent>
         {!isHistory && (
           <CardFooter className="flex flex-col gap-2 pt-0 pb-4 px-6">

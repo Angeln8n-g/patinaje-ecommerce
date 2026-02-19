@@ -6,8 +6,14 @@ import { ShipmentCard } from "@/components/delivery/ShipmentCard";
 import { Loader2, Package, Truck, MapPinOff } from "lucide-react";
 import { toast } from "sonner";
 import { mapDbOrderToOrder } from "@/lib/skating-store/supabase-queries";
+import dynamic from "next/dynamic";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+
+const DeliveryPointMap = dynamic(() => import("@/components/delivery/DeliveryPointMap"), {
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full flex items-center justify-center bg-muted rounded-xl border text-xs text-muted-foreground">Cargando mapa...</div>,
+});
 
 export default function DeliveryDashboard() {
   const [shipments, setShipments] = useState<any[]>([]);
@@ -112,10 +118,18 @@ export default function DeliveryDashboard() {
         <DialogContent>
           <DialogHeader><DialogTitle>¡Nuevo Pedido Asignado!</DialogTitle><DialogDescription>Tienes un nuevo pedido listo para entregar.</DialogDescription></DialogHeader>
           {newOrderData && (
-            <div className="py-4">
+            <div className="py-4 space-y-3">
               <p className="font-bold text-lg">Pedido #{newOrderData.order?.id?.slice(0, 8)}</p>
               <p>{newOrderData.order?.shipping?.address}</p>
               <p>{newOrderData.order?.shipping?.city}</p>
+              {newOrderData.order?.shipping?.lat && newOrderData.order?.shipping?.lng && (
+                <DeliveryPointMap
+                  deliveryLat={newOrderData.order.shipping.lat}
+                  deliveryLng={newOrderData.order.shipping.lng}
+                  customerName={newOrderData.order.shipping?.fullName || "Cliente"}
+                  address={`${newOrderData.order.shipping?.address || ""}, ${newOrderData.order.shipping?.city || ""}`}
+                />
+              )}
             </div>
           )}
           <Button onClick={() => setNewOrderPopupOpen(false)}>Entendido</Button>
