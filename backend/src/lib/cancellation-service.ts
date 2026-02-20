@@ -93,20 +93,36 @@ export async function validateCancellation(
   userId: string,
   role: "USER" | "DELIVERY" | "SELLER" | "ADMIN"
 ): Promise<ValidationResult> {
-  // Fetch order
-  const orderResult = await query(
+  // Fetch order — support both full UUID and partial ID (prefix match)
+  let orderResult;
+  const cleanId = orderId.replace(/^#/, "").trim();
+  
+  // Try exact match first
+  orderResult = await query(
     "SELECT * FROM skating_orders WHERE id = $1",
-    [orderId]
+    [cleanId]
   );
+  
+  // If not found, try prefix match (e.g. first 8 chars of UUID)
+  if (orderResult.rows.length === 0) {
+    orderResult = await query(
+      "SELECT * FROM skating_orders WHERE id::text LIKE $1",
+      [cleanId.toLowerCase() + "%"]
+    );
+  }
+  
   if (orderResult.rows.length === 0) {
     return { valid: false, error: "Pedido no encontrado", statusCode: 404 };
+  }
+  if (orderResult.rows.length > 1) {
+    return { valid: false, error: "ID ambiguo, use el ID completo del pedido", statusCode: 400 };
   }
   const order = orderResult.rows[0];
 
   // Fetch shipment if exists
   const shipmentResult = await query(
     "SELECT * FROM shipments WHERE order_id = $1 LIMIT 1",
-    [orderId]
+    [order.id]
   );
   const shipment = shipmentResult.rows[0] || null;
 
@@ -350,6 +366,9 @@ export async function cancelOrder(
     });
   }
 
+  // Use the resolved order ID (handles partial ID lookups)
+  const resolvedOrderId = validation.order?.id || orderId;
+
   let updatedOrder: any;
   let cancellation: any;
   let inventoryRestored = false;
@@ -358,7 +377,7 @@ export async function cancelOrder(
     // 1. Lock the order row with SELECT ... FOR UPDATE
     const lockResult = await client.query(
       "SELECT * FROM skating_orders WHERE id = $1 FOR UPDATE",
-      [orderId]
+      [resolvedOrderId]
     );
     if (lockResult.rows.length === 0) {
       throw Object.assign(new Error("Pedido no encontrado"), { statusCode: 404 });
@@ -376,14 +395,14 @@ export async function cancelOrder(
     // 2. Update order status to 'cancelled'
     const updateResult = await client.query(
       "UPDATE skating_orders SET status = 'cancelled' WHERE id = $1 RETURNING *",
-      [orderId]
+      [resolvedOrderId]
     );
     updatedOrder = updateResult.rows[0];
 
     // 3. If shipment exists, update to 'CANCELADO'
     await client.query(
       "UPDATE shipments SET status = 'CANCELADO', updated_at = NOW() WHERE order_id = $1",
-      [orderId]
+      [resolvedOrderId]
     );
 
     // 4. Restore inventory
@@ -393,7 +412,7 @@ export async function cancelOrder(
     const cancellationResult = await client.query(
       `INSERT INTO order_cancellations (order_id, cancelled_by, cancelled_by_role, reason_code, reason_description)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [orderId, cancelledBy, cancelledByRole, reasonCode, reasonDescription || null]
+      [resolvedOrderId, cancelledBy, cancelledByRole, reasonCode, reasonDescription || null]
     );
     cancellation = cancellationResult.rows[0];
   });

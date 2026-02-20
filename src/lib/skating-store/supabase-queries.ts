@@ -129,7 +129,13 @@ export async function confirmCashPayment(orderId: string, qrToken: string) {
 }
 
 export async function cancelOrderByDelay(orderId: string) {
-  return authFetch(`/api/orders/${orderId}/cancel`, { method: "POST" });
+  return authFetch(`/api/orders/${orderId}/cancel`, {
+    method: "POST",
+    body: {
+      reasonCode: "DELAY",
+      reasonDescription: "Cancelación por retraso en la entrega (más de 24 horas)",
+    },
+  });
 }
 
 export async function createContactMessage(message: Omit<ContactMessage, "id" | "created_at">) {

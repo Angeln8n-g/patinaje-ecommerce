@@ -142,7 +142,7 @@ export default function AdminCancellationsPage() {
             <Button
               variant="destructive"
               disabled={!newOrderId.trim()}
-              onClick={() => openCancelModal(newOrderId.trim())}
+              onClick={() => openCancelModal(newOrderId.trim().replace(/^#/, ""))}
             >
               <Ban className="h-4 w-4 mr-2" />
               Cancelar pedido
