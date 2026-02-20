@@ -70,7 +70,7 @@ export default function DeliveryPointMap({ deliveryLat, deliveryLng, customerNam
   if (driverPos) allPositions.push(driverPos);
 
   return (
-    <div className="h-[200px] w-full rounded-xl overflow-hidden border">
+    <div className="h-[200px] w-full rounded-xl overflow-hidden border relative z-0">
       <MapContainer center={deliveryPos} zoom={14} style={{ height: "100%", width: "100%" }} zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
