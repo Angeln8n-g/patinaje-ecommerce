@@ -94,6 +94,9 @@ Migraciones actuales:
 - `004_variant_prices.sql` — Precios por variante de producto
 - `005_promo_waitlist.sql` — Sistema de lista de espera para promociones (promo_status en banners + tabla promo_waitlist)
 - `006_order_fiscal_data.sql` — Columna fiscal_data (JSONB) en skating_orders para persistir datos de comprobante fiscal
+- `007_color_variant_type.sql` — Tipo de variante de color en productos
+- `008_order_cancellations.sql` — Sistema de cancelación de pedidos
+- `009_email_templates.sql` — Tabla email_templates para el editor de plantillas de email
 
 > Para futuras actualizaciones con cambios de base de datos:
 > ```bash

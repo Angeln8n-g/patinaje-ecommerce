@@ -115,6 +115,16 @@ pm2 restart skating-api
 
 Abre `https://hunykho.com` en tu navegador. Deberías ver la tienda.
 
+## Módulos del panel admin
+
+El frontend incluye los siguientes módulos en `/admin`:
+
+- Dashboard, Pedidos, Inventario, Productos, Categorías, Banners, Promociones
+- **Plantillas de Email** (`/admin/email-templates`) — Editor visual de plantillas HTML con vista previa, editor de código, variables dinámicas y envío de prueba vía Resend
+- **Cancelaciones** (`/admin/cancellations`) — Gestión de cancelaciones de pedidos
+- Variantes de color en productos (integrado en el formulario de producto)
+- Usuarios, Repartidores, Vendedores, Zonas de Entrega, Facturación Fiscal, Configuración
+
 ## Actualizaciones futuras
 
 ```bash
@@ -124,3 +134,13 @@ npm install
 npm run build
 pm2 restart skating-frontend
 ```
+
+> Si el backend tiene nuevas migraciones, también ejecuta en el backend:
+> ```bash
+> cd /home/skating-store/backend
+> git pull
+> npm install
+> npm run db:migrate
+> npm run build
+> pm2 restart skating-api
+> ```
