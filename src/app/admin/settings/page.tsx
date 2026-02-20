@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { getStaticContentClient, updateStaticContentClient } from "@/lib/skating-store/supabase-queries";
+import { authFetch } from "@/lib/api/client";
 
 export default function AdminSettingsPage() {
   const { user, isAdmin } = useAuth();
@@ -19,6 +20,9 @@ export default function AdminSettingsPage() {
   const [carouselSpeed, setCarouselSpeed] = useState(40); // Default 40s
   const [flashSaleEnd, setFlashSaleEnd] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [cancellationWindow, setCancellationWindow] = useState(30);
+  const [cancellationWindowError, setCancellationWindowError] = useState("");
+  const [isSavingCancellation, setIsSavingCancellation] = useState(false);
 
   useEffect(() => {
     // Load settings
@@ -35,6 +39,18 @@ export default function AdminSettingsPage() {
         }
       }
     });
+
+    // Load cancellation window config
+    authFetch<{ cancellation_window_minutes: number }>("/api/cancellations/config")
+      .then((config) => {
+        if (typeof config.cancellation_window_minutes === "number") {
+          setCancellationWindow(config.cancellation_window_minutes);
+        }
+      })
+      .catch(() => {
+        // Default to 30 if config not available
+        setCancellationWindow(30);
+      });
   }, []);
 
   const handleSave = async () => {
@@ -54,6 +70,26 @@ export default function AdminSettingsPage() {
       toast.error("Error al guardar la configuración: " + (error as any)?.message || "Desconocido");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveCancellationWindow = async () => {
+    if (cancellationWindow < 5 || cancellationWindow > 1440) {
+      setCancellationWindowError("La ventana debe estar entre 5 y 1440 minutos");
+      return;
+    }
+    setCancellationWindowError("");
+    setIsSavingCancellation(true);
+    try {
+      await authFetch("/api/cancellations/config", {
+        method: "PUT",
+        body: { cancellation_window_minutes: cancellationWindow },
+      });
+      toast.success("Ventana de cancelación actualizada");
+    } catch (error) {
+      toast.error("Error al guardar: " + ((error as any)?.message || "Desconocido"));
+    } finally {
+      setIsSavingCancellation(false);
     }
   };
 
@@ -133,6 +169,47 @@ export default function AdminSettingsPage() {
               checked={fiscalEnabled}
               onCheckedChange={setFiscalEnabled}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ventana de Cancelación</CardTitle>
+          <CardDescription>
+            Tiempo máximo en minutos que un usuario tiene para cancelar su pedido después de realizarlo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="cancellation-window">Minutos permitidos (5 - 1440)</Label>
+            <Input
+              id="cancellation-window"
+              type="number"
+              min={5}
+              max={1440}
+              value={cancellationWindow}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setCancellationWindow(val);
+                if (val < 5 || val > 1440) {
+                  setCancellationWindowError("La ventana debe estar entre 5 y 1440 minutos");
+                } else {
+                  setCancellationWindowError("");
+                }
+              }}
+            />
+            {cancellationWindowError && (
+              <p className="text-sm text-red-500">{cancellationWindowError}</p>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveCancellationWindow}
+              disabled={isSavingCancellation || !!cancellationWindowError}
+            >
+              {isSavingCancellation ? "Guardando..." : "Guardar Ventana"}
+            </Button>
           </div>
         </CardContent>
       </Card>

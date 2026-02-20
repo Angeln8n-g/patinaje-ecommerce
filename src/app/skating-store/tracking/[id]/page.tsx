@@ -11,6 +11,7 @@ import { Loader2, Package, Truck, CheckCircle2, MapPin, Banknote, QrCode, Clock,
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { getColorHex } from "@/lib/skating-store/color-utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
@@ -235,7 +236,20 @@ export default function OrderTrackingPage() {
               <CardContent><div className="space-y-3">
                 {order.items.map((item, idx) => {
                   const itemPrice = item.selectedVariant && item.product.variant_prices && item.product.variant_prices[item.selectedVariant] != null ? item.product.variant_prices[item.selectedVariant] : item.product.price;
-                  return (<div key={idx} className="flex justify-between text-sm"><span className="text-muted-foreground"><span className="font-bold text-foreground">{item.quantity}x</span> {item.product.name}{item.selectedVariant ? ` (${item.selectedVariant})` : ''}</span><span className="font-medium">{formatCurrency(itemPrice * item.quantity)}</span></div>);
+                  const isColorVariant = item.product.variant_type === 'color' && !!item.selectedVariant;
+                  const colorHex = isColorVariant && item.product.variant_options ? getColorHex(item.product.variant_options, item.selectedVariant!) : null;
+                  return (<div key={idx} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <span className="font-bold text-foreground">{item.quantity}x</span> {item.product.name}
+                      {isColorVariant ? (
+                        <span className="inline-flex items-center gap-1">
+                          {colorHex && <span className="inline-block w-3 h-3 rounded-full border border-gray-300 flex-shrink-0" style={{ backgroundColor: colorHex }} />}
+                          <span>Color: {item.selectedVariant}</span>
+                        </span>
+                      ) : item.selectedVariant ? ` (${item.selectedVariant})` : ''}
+                    </span>
+                    <span className="font-medium">{formatCurrency(itemPrice * item.quantity)}</span>
+                  </div>);
                 })}
                 <div className="pt-3 border-t flex justify-between items-center font-bold text-lg"><span>Total</span><span className="text-primary">{formatCurrency(order.total)}</span></div>
                 <div className="pt-2"><Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted font-medium">Método: {order.payment_method === "cash" ? "Efectivo" : "Tarjeta"}</Badge></div>

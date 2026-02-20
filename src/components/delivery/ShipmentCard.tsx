@@ -5,10 +5,12 @@ import { Shipment, ShipmentStatus } from "@/types/skating-store";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Phone, Package, Navigation, QrCode, Banknote, CheckCircle2, FileText } from "lucide-react";
+import { MapPin, Phone, Package, Navigation, QrCode, Banknote, CheckCircle2, FileText, XCircle } from "lucide-react";
 import { updateShipmentStatus } from "@/lib/skating-store/delivery-actions";
 import { confirmCashPayment } from "@/lib/skating-store/supabase-queries";
 import { generateAndSendInvoice } from "@/lib/skating-store/invoice-actions";
+import { cancelDeliveryOrder } from "@/lib/skating-store/order-cancellation-actions";
+import { CancelOrderModal } from "@/components/shared/CancelOrderModal";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import { useState } from "react";
@@ -31,6 +33,8 @@ interface ShipmentCardProps {
 export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   // Robust data handling
   const rawOrder = shipment.order;
@@ -160,12 +164,28 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
     }
   };
 
+  const canCancel = shipment.status === 'ASIGNADO' || shipment.status === 'EN_RUTA';
+
+  const handleCancelOrder = async (reasonCode: string, reasonDescription?: string) => {
+    setIsCancelling(true);
+    try {
+      await cancelDeliveryOrder(order.id, { reasonCode, reasonDescription });
+      toast.success("Pedido cancelado exitosamente");
+      setIsCancelModalOpen(false);
+      onUpdate();
+    } catch (error: any) {
+      toast.error(error.message || "Error al cancelar el pedido");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const getStatusColor = (status: ShipmentStatus) => {
     switch (status) {
       case 'ASIGNADO': return 'secondary';
-      case 'EN_RUTA': return 'default'; // blue-ish usually
-      case 'CERCA': return 'warning'; // yellow-ish? default warning variant might not exist, using outline or secondary
-      case 'ENTREGADO': return 'outline'; // green-ish usually
+      case 'EN_RUTA': return 'default';
+      case 'CERCA': return 'warning';
+      case 'ENTREGADO': return 'outline';
       default: return 'default';
     }
   };
@@ -311,6 +331,18 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
                 )}
               </>
             )}
+
+            {canCancel && (
+              <Button
+                variant="ghost"
+                className="w-full h-11 rounded-xl font-bold text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setIsCancelModalOpen(true)}
+                disabled={isLoading}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Cancelar Pedido
+              </Button>
+            )}
           </CardFooter>
         )}
       </Card>
@@ -335,6 +367,14 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CancelOrderModal
+        open={isCancelModalOpen}
+        onOpenChange={setIsCancelModalOpen}
+        role="DELIVERY"
+        onConfirm={handleCancelOrder}
+        loading={isCancelling}
+      />
     </>
   );
 }

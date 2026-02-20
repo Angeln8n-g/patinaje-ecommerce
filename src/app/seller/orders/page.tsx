@@ -21,19 +21,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, AlertTriangle, ArrowUp, ArrowDown, Receipt } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, ArrowUp, ArrowDown, Receipt, XCircle } from "lucide-react";
 import { getSellerOrders, markOrderAsDispatched } from "@/lib/skating-store/seller-actions";
 import { createProductExchange, searchProductsForPOS } from "@/lib/skating-store/pos-actions";
+import { cancelSellerOrder } from "@/lib/skating-store/order-cancellation-actions";
 import { Order, Product } from "@/types/skating-store";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FiscalInvoiceDialog } from "@/components/fiscal/FiscalInvoiceDialog";
+import { CancelOrderModal } from "@/components/shared/CancelOrderModal";
 
 const statusLabels: Record<string, string> = {
   pending: "Pendiente",
   confirmed: "Confirmado",
   shipped: "Enviado",
   delivered: "Entregado",
+  cancelled: "Cancelado",
 };
 
 export default function SellerOrdersPage() {
@@ -59,6 +62,11 @@ export default function SellerOrdersPage() {
   const [fiscalOpen, setFiscalOpen] = useState(false);
   const [fiscalOrderId, setFiscalOrderId] = useState("");
   const [fiscalCustomerName, setFiscalCustomerName] = useState("");
+
+  // Cancel order state
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const loadOrders = async (from?: string, to?: string) => {
     setLoading(true);
@@ -99,6 +107,22 @@ export default function SellerOrdersPage() {
       toast.error(error.message || "Error al despachar pedido");
     } finally {
       setDispatchingId(null);
+    }
+  };
+
+  const handleCancelOrder = async (reasonCode: string, reasonDescription?: string) => {
+    if (!cancelOrderId) return;
+    setIsCancelling(true);
+    try {
+      await cancelSellerOrder(cancelOrderId, { reasonCode, reasonDescription });
+      toast.success("Pedido cancelado exitosamente");
+      setCancelModalOpen(false);
+      setCancelOrderId(null);
+      await loadOrders(dateFrom || undefined, dateTo || undefined);
+    } catch (error: any) {
+      toast.error(error.message || "Error al cancelar el pedido");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -281,6 +305,19 @@ export default function SellerOrdersPage() {
                             <Receipt className="h-4 w-4 text-blue-600" />
                           </Button>
                         )}
+                        {order.status !== "delivered" && order.status !== "cancelled" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setCancelOrderId(order.id);
+                              setCancelModalOpen(true);
+                            }}
+                            title="Cancelar pedido"
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -449,6 +486,18 @@ export default function SellerOrdersPage() {
         onOpenChange={setFiscalOpen}
         orderId={fiscalOrderId}
         customerName={fiscalCustomerName}
+      />
+
+      {/* Cancel Order Modal */}
+      <CancelOrderModal
+        open={cancelModalOpen}
+        onOpenChange={(open) => {
+          setCancelModalOpen(open);
+          if (!open) setCancelOrderId(null);
+        }}
+        role="SELLER"
+        onConfirm={handleCancelOrder}
+        loading={isCancelling}
       />
     </div>
   );

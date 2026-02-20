@@ -150,7 +150,11 @@ export function InvoicePreview({ open, onOpenChange, order, onSendInvoice, sendi
               <tbody>
                 {items.map((item: any, idx: number) => {
                   const name = item.product?.name || "Producto";
-                  const variant = item.selectedVariant ? ` (${item.selectedVariant})` : "";
+                  const variant = item.selectedVariant
+                    ? item.product?.variant_type === "color"
+                      ? ` - Color: ${item.selectedVariant}`
+                      : ` (${item.selectedVariant})`
+                    : "";
                   const price = getItemPrice(item);
                   const lineTotal = price * (item.quantity || 1);
                   const lineItbis = round2(lineTotal - round2(lineTotal / (1 + ITBIS_RATE)));

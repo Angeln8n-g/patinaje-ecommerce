@@ -1,0 +1,20 @@
+-- Migration 007: Document 'color' as a new valid value for variant_type
+--
+-- The field variant_type is VARCHAR(20) without a CHECK constraint,
+-- so no ALTER TABLE or DDL change is needed.
+--
+-- Valid values for variant_type:
+--   'none'        - Product has no variants
+--   'size'        - Product has size variants (e.g. "S", "M", "L")
+--   'measurement' - Product has measurement variants (e.g. "42", "43")
+--   'color'       - Product has color variants (e.g. "Rojo:#FF0000")
+--
+-- Storage format for color variants:
+--   variant_options (TEXT[]): Each element uses the format "NombreColor:#HexCode"
+--     Example: ARRAY['Rojo:#FF0000', 'Azul:#0000FF', 'Negro:#000000']
+--
+--   variant_prices (JSONB): Each key is the color name, value is the price
+--     Example: {"Rojo": 59.99, "Azul": 64.99, "Negro": 54.99}
+--
+-- No-op migration: this file exists for documentation and change tracking purposes only.
+SELECT 1;

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query } from "../db/pool.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
+import { validateColorOptions } from "../lib/color-validation.js";
 
 const router = Router();
 
@@ -101,6 +102,16 @@ router.get("/:id", async (req, res) => {
 router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const { name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, status, subcategory, unit_type, supplier, purchase_price } = req.body;
+
+    // Validate color variant options
+    if (variant_type === 'color' && Array.isArray(variant_options)) {
+      const colorError = validateColorOptions(variant_options);
+      if (colorError) {
+        res.status(400).json({ error: colorError });
+        return;
+      }
+    }
+
     const result = await query(
       `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, status, subcategory, unit_type, supplier, purchase_price)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
@@ -181,6 +192,16 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
 router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res) => {
   try {
     const fields = req.body;
+
+    // Validate color variant options
+    if (fields.variant_type === 'color' && Array.isArray(fields.variant_options)) {
+      const colorError = validateColorOptions(fields.variant_options);
+      if (colorError) {
+        res.status(400).json({ error: colorError });
+        return;
+      }
+    }
+
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;

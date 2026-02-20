@@ -3,18 +3,20 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, updateProfile, getUserOrders, cancelOrderByDelay } from "@/lib/skating-store/supabase-queries";
+import { cancelUserOrder } from "@/lib/skating-store/order-cancellation-actions";
 import { authFetch } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock, Store, XCircle } from "lucide-react";
+import { Loader2, Save, User as UserIcon, MapPin, Phone, ShoppingBag, ArrowRight, Clock, Truck, CheckCircle2, Package, Lock, Store, XCircle, Ban } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Order } from "@/types/skating-store";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CancelOrderModal } from "@/components/shared/CancelOrderModal";
 
 const STATUS_MAP = {
   pending: { label: "Pendiente", icon: Clock, color: "bg-amber-100 text-amber-700" },
@@ -32,6 +34,8 @@ export default function ProfilePage() {
   const [changingPassword, setSavingPassword] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelTargetOrder, setCancelTargetOrder] = useState<Order | null>(null);
   const [formData, setFormData] = useState({
     first_name: "", last_name: "", phone: "",
     address_street: "", address_city: "", address_state: "",
@@ -83,18 +87,43 @@ export default function ProfilePage() {
     finally { setSavingPassword(false); }
   };
 
-  const canCancel = (order: Order) => {
+  const canCancelByDelay = (order: Order) => {
     if (order.status === "delivered" || order.status === "cancelled") return false;
     const hoursDiff = (Date.now() - new Date(order.created_at).getTime()) / (1000 * 60 * 60);
     return hoursDiff >= 24;
   };
 
-  const handleCancel = async (orderId: string) => {
+  const canCancelByUser = (order: Order) => {
+    return order.status === "pending";
+  };
+
+  const handleCancelByDelay = async (orderId: string) => {
     if (!confirm("¿Estás seguro de que deseas cancelar este pedido por retraso?")) return;
     setCancellingId(orderId);
     try {
       await cancelOrderByDelay(orderId);
       toast.success("Pedido cancelado exitosamente");
+      if (user) await loadOrders(user.id);
+    } catch (error: any) {
+      toast.error(error.message || "Error al cancelar el pedido");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const handleOpenCancelModal = (order: Order) => {
+    setCancelTargetOrder(order);
+    setCancelModalOpen(true);
+  };
+
+  const handleCancelConfirm = async (reasonCode: string, reasonDescription?: string) => {
+    if (!cancelTargetOrder) return;
+    setCancellingId(cancelTargetOrder.id);
+    try {
+      await cancelUserOrder(cancelTargetOrder.id, { reasonCode, reasonDescription });
+      toast.success("Pedido cancelado exitosamente");
+      setCancelModalOpen(false);
+      setCancelTargetOrder(null);
       if (user) await loadOrders(user.id);
     } catch (error: any) {
       toast.error(error.message || "Error al cancelar el pedido");
@@ -141,15 +170,26 @@ export default function ProfilePage() {
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-muted-foreground">{order.items.length} {order.items.length === 1 ? "producto" : "productos"} • <span className="font-bold text-foreground">${order.total.toFixed(2)}</span></div>
                         <div className="flex items-center gap-2">
-                          {canCancel(order) && (
+                          {canCancelByUser(order) && (
                             <Button
                               size="sm"
                               variant="ghost"
                               className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold"
                               disabled={cancellingId === order.id}
-                              onClick={() => handleCancel(order.id)}
+                              onClick={() => handleOpenCancelModal(order)}
                             >
-                              {cancellingId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="mr-1 h-4 w-4" />Cancelar</>}
+                              {cancellingId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Ban className="mr-1 h-4 w-4" />Cancelar</>}
+                            </Button>
+                          )}
+                          {canCancelByDelay(order) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold"
+                              disabled={cancellingId === order.id}
+                              onClick={() => handleCancelByDelay(order.id)}
+                            >
+                              {cancellingId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="mr-1 h-4 w-4" />Cancelar por retraso</>}
                             </Button>
                           )}
                           <Link href={`/skating-store/tracking/${order.id}`}><Button size="sm" variant="ghost" className="text-primary hover:text-primary hover:bg-primary/5 font-bold">Rastrear Pedido<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
@@ -196,6 +236,17 @@ export default function ProfilePage() {
           </form>
         </div>
       </div>
+
+      <CancelOrderModal
+        open={cancelModalOpen}
+        onOpenChange={(open) => {
+          setCancelModalOpen(open);
+          if (!open) setCancelTargetOrder(null);
+        }}
+        role="USER"
+        onConfirm={handleCancelConfirm}
+        loading={cancellingId !== null}
+      />
     </div>
   );
 }

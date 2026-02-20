@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useSkatingCart } from "@/contexts/SkatingCartContext";
 import { Minus, Plus, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { getColorHex } from "@/lib/skating-store/color-utils";
 
 interface CartItemProps {
   item: CartItemType;
@@ -15,6 +16,9 @@ interface CartItemProps {
 export function CartItem({ item, editable = true }: CartItemProps) {
   const { updateQuantity } = useSkatingCart();
   const { product, quantity } = item;
+  const colorHex = product.variant_type === 'color' && item.selectedVariant && product.variant_options
+    ? getColorHex(product.variant_options, item.selectedVariant)
+    : null;
 
   return (
     <div className="flex gap-4 py-6 items-center">
@@ -37,8 +41,14 @@ export function CartItem({ item, editable = true }: CartItemProps) {
         <div className="space-y-2">
           <h3 className="font-semibold text-base line-clamp-2 max-w-[240px] leading-tight">{product.name}</h3>
           {item.selectedVariant && (
-            <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-              {product.variant_type === 'size' ? 'Talla' : 'Medida'}: {item.selectedVariant}
+            <div className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+              {colorHex && (
+                <span
+                  className="inline-block h-3 w-3 rounded-full shrink-0 border border-border/50"
+                  style={{ backgroundColor: colorHex }}
+                />
+              )}
+              {product.variant_type === 'color' ? 'Color' : product.variant_type === 'size' ? 'Talla' : 'Medida'}: {item.selectedVariant}
             </div>
           )}
           <p className="font-extrabold text-xl">{formatCurrency(

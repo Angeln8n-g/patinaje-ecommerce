@@ -75,7 +75,7 @@ export interface Product {
   supplier?: string;
   purchase_price?: number;
   status: 'active' | 'inactive';
-  variant_type?: 'none' | 'size' | 'measurement';
+  variant_type?: 'none' | 'size' | 'measurement' | 'color';
   variant_options?: string[];
   variant_prices?: Record<string, number>;
   created_at: string;

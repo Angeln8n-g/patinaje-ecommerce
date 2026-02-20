@@ -18,6 +18,8 @@ import { getCategories } from "@/lib/skating-store/content-actions";
 import { Plus, X, Image as ImageIcon, RefreshCw, Printer } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { ImageUpload } from "@/components/admin/ImageUpload";
+import { ColorVariantEditor } from "@/components/admin/ColorVariantEditor";
+import { ColorOption, parseColorOptions, formatColorOption } from "@/lib/skating-store/color-utils";
 
 function generateBarcode(): string {
   const prefix = "SK";
@@ -35,7 +37,7 @@ const formSchema = z.object({
   images: z.array(z.string().url("Debe ser una URL válida")).min(1, "Añade al menos una imagen"),
   featured: z.boolean(),
   barcode: z.string().optional(),
-  variant_type: z.enum(["none", "size", "measurement"]),
+  variant_type: z.enum(["none", "size", "measurement", "color"]),
   variant_options: z.array(z.string()),
   variant_prices: z.record(z.string(), z.number()).optional(),
 });
@@ -51,6 +53,16 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [variantInput, setVariantInput] = useState("");
   const router = useRouter();
+
+  // Color variant state
+  const initialColors = initialData?.variant_type === "color" && initialData.variant_options
+    ? parseColorOptions(initialData.variant_options)
+    : [];
+  const initialColorPrices = initialData?.variant_type === "color" && initialData.variant_prices
+    ? initialData.variant_prices
+    : {};
+  const [colorOptions, setColorOptions] = useState<ColorOption[]>(initialColors);
+  const [colorPrices, setColorPrices] = useState<Record<string, number>>(initialColorPrices);
 
   useEffect(() => {
     getCategories().then(setCategories).catch(console.error);
@@ -76,6 +88,12 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
     try {
+      // Convert color state to variant_options/variant_prices when saving
+      if (values.variant_type === "color") {
+        values.variant_options = colorOptions.map(formatColorOption);
+        values.variant_prices = { ...colorPrices };
+      }
+
       const productData = {
         ...values,
         status: (initialData?.status || 'active') as 'active' | 'inactive',
@@ -378,6 +396,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
                     <SelectItem value="none">Ninguno (Producto único)</SelectItem>
                     <SelectItem value="size">Tallas (ej: 7, 8, S, M, L)</SelectItem>
                     <SelectItem value="measurement">Medidas (ej: 10cm, 20x30)</SelectItem>
+                    <SelectItem value="color">Color (ej: Rojo, Azul)</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
@@ -388,7 +407,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
             )}
           />
 
-          {currentVariantType !== "none" && (
+          {currentVariantType !== "none" && currentVariantType !== "color" && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
               <FormLabel>Opciones Disponibles</FormLabel>
               <div className="flex gap-2">
@@ -444,6 +463,20 @@ export function ProductForm({ initialData }: ProductFormProps) {
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+            </div>
+          )}
+
+          {currentVariantType === "color" && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <ColorVariantEditor
+                colors={colorOptions}
+                basePrice={form.watch("price") || 0}
+                prices={colorPrices}
+                onChange={(colors, prices) => {
+                  setColorOptions(colors);
+                  setColorPrices(prices);
+                }}
               />
             </div>
           )}

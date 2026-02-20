@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Printer, X } from "lucide-react";
 import { Order } from "@/types/skating-store";
+import { getColorHex } from "@/lib/skating-store/color-utils";
 
 interface POSReceiptProps {
   order: Order;
@@ -51,9 +52,14 @@ export function POSReceipt({ order, sellerName, change, onClose }: POSReceiptPro
                 <div>
                   <span>{item.quantity}x </span>
                   <span>{item.product.name}</span>
-                  {item.selectedVariant && (
+                  {item.product.variant_type === 'color' && item.selectedVariant ? (
+                    <span className="text-muted-foreground inline-flex items-center gap-1 ml-1">
+                      {(() => { const hex = item.product.variant_options ? getColorHex(item.product.variant_options, item.selectedVariant) : null; return hex ? <span className="inline-block w-2.5 h-2.5 rounded-full border border-gray-300" style={{ backgroundColor: hex }} /> : null; })()}
+                      <span>Color: {item.selectedVariant}</span>
+                    </span>
+                  ) : item.selectedVariant ? (
                     <span className="text-muted-foreground"> ({item.selectedVariant})</span>
-                  )}
+                  ) : null}
                 </div>
                 <span>${(item.product.price * item.quantity).toFixed(2)}</span>
               </div>

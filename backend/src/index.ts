@@ -19,6 +19,8 @@ import contactRoutes from "./routes/contact.js";
 import uploadRoutes from "./routes/upload.js";
 import fiscalRoutes from "./routes/fiscal.js";
 import promotionRoutes from "./routes/promotions.js";
+import cancellationRoutes from "./routes/cancellations.js";
+import emailTemplateRoutes from "./routes/email-templates.js";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
@@ -48,6 +50,8 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/fiscal", fiscalRoutes);
 app.use("/api/promotions", promotionRoutes);
+app.use("/api/cancellations", cancellationRoutes);
+app.use("/api/email-templates", emailTemplateRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

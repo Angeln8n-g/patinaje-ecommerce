@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode, UserCheck, Receipt, Bell } from "lucide-react";
+import { LayoutDashboard, Package, Users, Settings, LogOut, ShoppingCart, Map, MapPin, Truck, Tags, Megaphone, Store, FileText, Barcode, UserCheck, Receipt, Bell, XCircle, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { getStaticContentClient } from "@/lib/skating-store/supabase-queries";
@@ -19,6 +19,11 @@ const navItems = [
     title: "Pedidos",
     href: "/admin/orders",
     icon: ShoppingCart,
+  },
+  {
+    title: "Cancelaciones",
+    href: "/admin/cancellations",
+    icon: XCircle,
   },
   {
     title: "Inventario",
@@ -49,6 +54,11 @@ const navItems = [
     title: "Promociones",
     href: "/admin/promotions",
     icon: Bell,
+  },
+  {
+    title: "Plantillas de Email",
+    href: "/admin/email-templates",
+    icon: Mail,
   },
   {
     title: "Páginas",

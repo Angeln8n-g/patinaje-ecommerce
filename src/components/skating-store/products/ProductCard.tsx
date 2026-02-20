@@ -11,6 +11,8 @@ import { useFavorites } from "@/contexts/FavoritesContext";
 import { toast } from "sonner";
 import { Heart } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { ColorDots } from "@/components/skating-store/products/ColorDots";
+import { parseColorOptions } from "@/lib/skating-store/color-utils";
 
 interface ProductCardProps {
   product: Product;
@@ -118,6 +120,12 @@ export function ProductCard({ product }: ProductCardProps) {
         <CardContent className="p-4">
           <h3 className="font-bold text-base line-clamp-2 mb-2 min-h-[3rem]">{product.name}</h3>
           
+          {product.variant_type === "color" && product.variant_options && product.variant_options.length > 0 && (
+            <div className="mb-2">
+              <ColorDots colors={parseColorOptions(product.variant_options)} />
+            </div>
+          )}
+
           <div className="flex items-baseline gap-2">
             {product.variant_prices && Object.keys(product.variant_prices).length > 0 ? (() => {
               const prices = Object.values(product.variant_prices as Record<string, number>);
