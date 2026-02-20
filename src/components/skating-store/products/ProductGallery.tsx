@@ -7,11 +7,15 @@ import { cn } from "@/lib/utils";
 interface ProductGalleryProps {
   images: string[];
   productName: string;
+  activeImage?: string | null;
 }
 
-export function ProductGallery({ images, productName }: ProductGalleryProps) {
+export function ProductGallery({ images, productName, activeImage }: ProductGalleryProps) {
   const defaultImage = "https://placehold.co/600x600/png?text=Skate";
   const [selectedImage, setSelectedImage] = useState(images[0] || defaultImage);
+
+  // When activeImage changes from color selection, override the displayed image
+  const displayedImage = activeImage || selectedImage;
 
   const displayImages = images.length > 0 ? images : [defaultImage];
 
@@ -22,10 +26,10 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
-        {isVideo(selectedImage) ? (
+        {isVideo(displayedImage) ? (
           <video
-            key={selectedImage}
-            src={selectedImage}
+            key={displayedImage}
+            src={displayedImage}
             controls
             className="h-full w-full object-cover"
             autoPlay
@@ -35,7 +39,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
           />
         ) : (
           <Image
-            src={selectedImage}
+            src={displayedImage}
             alt={productName}
             fill
             className="object-cover"

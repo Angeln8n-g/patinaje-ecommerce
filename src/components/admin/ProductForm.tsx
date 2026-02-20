@@ -63,6 +63,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
     : {};
   const [colorOptions, setColorOptions] = useState<ColorOption[]>(initialColors);
   const [colorPrices, setColorPrices] = useState<Record<string, number>>(initialColorPrices);
+  const initialColorImages = initialData?.variant_type === "color" && initialData.variant_images
+    ? initialData.variant_images
+    : {};
+  const [colorImages, setColorImages] = useState<Record<string, string>>(initialColorImages);
 
   useEffect(() => {
     getCategories().then(setCategories).catch(console.error);
@@ -92,6 +96,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       if (values.variant_type === "color") {
         values.variant_options = colorOptions.map(formatColorOption);
         values.variant_prices = { ...colorPrices };
+        (values as any).variant_images = { ...colorImages };
       }
 
       const productData = {
@@ -473,9 +478,11 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 colors={colorOptions}
                 basePrice={form.watch("price") || 0}
                 prices={colorPrices}
-                onChange={(colors, prices) => {
+                images={colorImages}
+                onChange={(colors, prices, images) => {
                   setColorOptions(colors);
                   setColorPrices(prices);
+                  setColorImages(images);
                 }}
               />
             </div>

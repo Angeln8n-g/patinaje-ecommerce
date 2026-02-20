@@ -7,18 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { ColorOption, isValidHex } from "@/lib/skating-store/color-utils";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 interface ColorVariantEditorProps {
   colors: ColorOption[];
   basePrice: number;
   prices: Record<string, number>;
-  onChange: (colors: ColorOption[], prices: Record<string, number>) => void;
+  images: Record<string, string>;
+  onChange: (colors: ColorOption[], prices: Record<string, number>, images: Record<string, string>) => void;
 }
 
 export function ColorVariantEditor({
   colors,
   basePrice,
   prices,
+  images,
   onChange,
 }: ColorVariantEditorProps) {
   const [newName, setNewName] = useState("");
@@ -49,7 +52,7 @@ export function ColorVariantEditor({
 
     const updatedColors = [...colors, { name: trimmedName, hex: newHex }];
     const updatedPrices = { ...prices, [trimmedName]: basePrice };
-    onChange(updatedColors, updatedPrices);
+    onChange(updatedColors, updatedPrices, images);
     setNewName("");
     setNewHex("#000000");
   };
@@ -58,11 +61,23 @@ export function ColorVariantEditor({
     const updatedColors = colors.filter((c) => c.name !== name);
     const updatedPrices = { ...prices };
     delete updatedPrices[name];
-    onChange(updatedColors, updatedPrices);
+    const updatedImages = { ...images };
+    delete updatedImages[name];
+    onChange(updatedColors, updatedPrices, updatedImages);
   };
 
   const updatePrice = (name: string, price: number) => {
-    onChange(colors, { ...prices, [name]: price });
+    onChange(colors, { ...prices, [name]: price }, images);
+  };
+
+  const updateImage = (name: string, urls: string[]) => {
+    const updatedImages = { ...images };
+    if (urls.length > 0) {
+      updatedImages[name] = urls[0];
+    } else {
+      delete updatedImages[name];
+    }
+    onChange(colors, prices, updatedImages);
   };
 
   return (
@@ -127,37 +142,49 @@ export function ColorVariantEditor({
         {colors.map((color) => (
           <div
             key={color.name}
-            className="flex items-center gap-2 bg-muted/50 p-3 rounded-lg border"
+            className="flex flex-col gap-2 bg-muted/50 p-3 rounded-lg border"
           >
-            <div
-              className="h-6 w-6 rounded-full border shrink-0"
-              style={{ backgroundColor: color.hex }}
-              title={color.hex}
-            />
-            <span className="font-medium text-sm min-w-[4rem]">
-              {color.name}
-            </span>
-            <span className="text-xs text-muted-foreground">{color.hex}</span>
-            <div className="flex items-center gap-1 ml-auto">
-              <span className="text-xs text-muted-foreground">$</span>
-              <Input
-                type="number"
-                step="0.01"
-                className="w-28 h-8 text-sm"
-                value={prices[color.name] ?? basePrice}
-                onChange={(e) =>
-                  updatePrice(color.name, parseFloat(e.target.value) || 0)
-                }
-                placeholder="Precio"
+            <div className="flex items-center gap-2">
+              <div
+                className="h-6 w-6 rounded-full border shrink-0"
+                style={{ backgroundColor: color.hex }}
+                title={color.hex}
+              />
+              <span className="font-medium text-sm min-w-[4rem]">
+                {color.name}
+              </span>
+              <span className="text-xs text-muted-foreground">{color.hex}</span>
+              <div className="flex items-center gap-1 ml-auto">
+                <span className="text-xs text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="w-28 h-8 text-sm"
+                  value={prices[color.name] ?? basePrice}
+                  onChange={(e) =>
+                    updatePrice(color.name, parseFloat(e.target.value) || 0)
+                  }
+                  placeholder="Precio"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeColor(color.name)}
+                className="hover:text-destructive transition-colors ml-2"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="pl-8">
+              <Label className="text-xs text-muted-foreground mb-1 block">Imagen del color</Label>
+              <ImageUpload
+                value={images[color.name] ? [images[color.name]] : []}
+                onChange={(urls) => updateImage(color.name, urls)}
+                folder="products"
+                single
+                className="[&_.aspect-square]:!h-16 [&_.aspect-square]:!w-16"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => removeColor(color.name)}
-              className="hover:text-destructive transition-colors ml-2"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
         ))}
         {colors.length === 0 && (

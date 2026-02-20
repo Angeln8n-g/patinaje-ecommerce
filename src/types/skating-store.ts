@@ -78,6 +78,7 @@ export interface Product {
   variant_type?: 'none' | 'size' | 'measurement' | 'color';
   variant_options?: string[];
   variant_prices?: Record<string, number>;
+  variant_images?: Record<string, string>;
   created_at: string;
   updated_at: string;
 }

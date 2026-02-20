@@ -19,7 +19,7 @@ export function getVariantPrice(product: Product, variant?: string): number {
   return product.price;
 }
 
-export function ProductActions({ product }: { product: Product }) {
+export function ProductActions({ product, onColorChange }: { product: Product; onColorChange?: (color: string) => void }) {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<string>("");
   const { addItem } = useSkatingCart();
@@ -92,7 +92,10 @@ export function ProductActions({ product }: { product: Product }) {
         <ColorPicker
           colors={colorOptions}
           selectedColor={selectedVariant || null}
-          onSelect={setSelectedVariant}
+          onSelect={(color) => {
+            setSelectedVariant(color);
+            onColorChange?.(color);
+          }}
         />
       )}
 
