@@ -26,7 +26,9 @@ export async function updateProductStock(
   if (newPrice !== undefined) {
     await authFetch(`/api/products/${productId}`, { method: "PUT", body: { price: newPrice } });
   }
-  return { newStock: 0, newPrice: newPrice || 0 }; // Caller should refresh
+  // Fetch updated product to return real values
+  const updated = await apiClient<Product>(`/api/products/${productId}`);
+  return { newStock: updated.stock, newPrice: updated.price };
 }
 
 export async function quickCreateProduct(productData: Omit<Product, "id" | "created_at" | "updated_at">) {

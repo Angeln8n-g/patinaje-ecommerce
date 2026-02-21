@@ -149,8 +149,8 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
           continue;
         }
         const result = await query(
-          `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, status, subcategory, unit_type, supplier, purchase_price)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
            RETURNING *`,
           [
             p.name,
@@ -164,6 +164,7 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
             p.variant_type || "none",
             p.variant_options || [],
             JSON.stringify(p.variant_prices || {}),
+            JSON.stringify(p.variant_images || {}),
             p.status || "active",
             p.subcategory || null,
             p.unit_type || null,

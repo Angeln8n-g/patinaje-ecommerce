@@ -121,7 +121,11 @@ export default function InventoryPage() {
         status: 'active',
         featured: false,
         description: "",
-        images: []
+        images: [],
+        variant_type: "none",
+        variant_options: [],
+        variant_prices: {},
+        variant_images: {},
       };
 
       const created = await quickCreateProduct(productData);
