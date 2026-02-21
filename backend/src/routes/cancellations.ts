@@ -130,7 +130,7 @@ router.get("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
     params.push(offset);
     const dataResult = await query(
       `SELECT oc.*, 
-              p.full_name AS cancelled_by_name,
+              COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), p.email) AS cancelled_by_name,
               o.customer_name, o.total, o.status AS order_status
        FROM order_cancellations oc
        JOIN profiles p ON p.id = oc.cancelled_by
