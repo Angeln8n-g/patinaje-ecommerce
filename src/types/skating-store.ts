@@ -127,7 +127,7 @@ export interface Order {
   fiscal_data?: any;
 }
 
-export type ShipmentStatus = 'ASIGNADO' | 'EN_RUTA' | 'CERCA' | 'ENTREGADO';
+export type ShipmentStatus = 'ASIGNADO' | 'EN_RUTA' | 'CERCA' | 'ENTREGADO' | 'CANCELADO';
 
 export interface Shipment {
   id: string;

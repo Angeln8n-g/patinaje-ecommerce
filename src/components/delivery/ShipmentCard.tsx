@@ -180,12 +180,13 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
     }
   };
 
-  const getStatusColor = (status: ShipmentStatus) => {
+  const getStatusColor = (status: ShipmentStatus | 'CANCELADO') => {
     switch (status) {
       case 'ASIGNADO': return 'secondary';
       case 'EN_RUTA': return 'default';
       case 'CERCA': return 'warning';
       case 'ENTREGADO': return 'outline';
+      case 'CANCELADO': return 'destructive';
       default: return 'default';
     }
   };
@@ -197,19 +198,26 @@ export function ShipmentCard({ shipment, onUpdate }: ShipmentCardProps) {
 
   const isCashOrder = order.payment_method === 'cash';
   const isPendingPayment = order.payment_status === 'pending';
-  const isHistory = shipment.status === 'ENTREGADO';
+  const isHistory = shipment.status === 'ENTREGADO' || shipment.status === 'CANCELADO';
+  const isCancelled = shipment.status === 'CANCELADO';
 
   return (
     <>
-      <Card className={cn("mb-4 overflow-hidden border-none shadow-md transition-all hover:shadow-lg", isHistory && "opacity-80")}>
-        <CardHeader className={cn("pb-2", isHistory ? "bg-muted/30" : "bg-primary/5")}>
+      <Card className={cn("mb-4 overflow-hidden border-none shadow-md transition-all hover:shadow-lg", isHistory && "opacity-80", isCancelled && "opacity-70")}>
+        <CardHeader className={cn("pb-2", isCancelled ? "bg-destructive/5" : isHistory ? "bg-muted/30" : "bg-primary/5")}>
           <div className="flex justify-between items-start">
             <div className="flex flex-col gap-1">
               <CardTitle className="text-lg font-bold tracking-tight">Pedido #{order.id.slice(0, 8)}</CardTitle>
-              {isHistory && (
+              {shipment.status === 'ENTREGADO' && (
                 <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
                   <CheckCircle2 className="h-3 w-3 text-green-600" />
                   ENTREGADO EL {new Date(shipment.updated_at).toLocaleDateString()}
+                </p>
+              )}
+              {isCancelled && (
+                <p className="text-[10px] text-destructive flex items-center gap-1 font-medium">
+                  <XCircle className="h-3 w-3" />
+                  CANCELADO EL {new Date(shipment.updated_at).toLocaleDateString()}
                 </p>
               )}
             </div>

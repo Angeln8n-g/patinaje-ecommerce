@@ -42,7 +42,7 @@ router.get("/shipments/active", requireAuth, requireRole("DELIVERY"), async (req
     const result = await query(
       `SELECT s.*, row_to_json(o) as order FROM shipments s
        LEFT JOIN skating_orders o ON o.id = s.order_id
-       WHERE s.delivery_man_id = $1 AND s.status != 'ENTREGADO'
+       WHERE s.delivery_man_id = $1 AND s.status NOT IN ('ENTREGADO', 'CANCELADO')
        ORDER BY s.created_at DESC`, [userId]
     );
     res.json(result.rows);
@@ -58,7 +58,7 @@ router.get("/shipments/history", requireAuth, requireRole("DELIVERY"), async (re
     const result = await query(
       `SELECT s.*, row_to_json(o) as order FROM shipments s
        LEFT JOIN skating_orders o ON o.id = s.order_id
-       WHERE s.delivery_man_id = $1 AND s.status = 'ENTREGADO'
+       WHERE s.delivery_man_id = $1 AND s.status IN ('ENTREGADO', 'CANCELADO')
        ORDER BY s.updated_at DESC`, [userId]
     );
     res.json(result.rows);
