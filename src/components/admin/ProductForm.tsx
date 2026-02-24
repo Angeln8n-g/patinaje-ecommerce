@@ -12,10 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Product, Category } from "@/types/skating-store";
+import { Product, Category, Store } from "@/types/skating-store";
 import { createProduct, updateProduct } from "@/lib/skating-store/product-actions";
 import { getCategories } from "@/lib/skating-store/content-actions";
-import { Plus, X, Image as ImageIcon, RefreshCw, Printer } from "lucide-react";
+import { getStores } from "@/lib/skating-store/store-actions";
+import { Plus, X, Image as ImageIcon, RefreshCw, Printer, Store as StoreIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { ColorVariantEditor } from "@/components/admin/ColorVariantEditor";
@@ -51,6 +52,8 @@ interface ProductFormProps {
 export function ProductForm({ initialData }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const [variantInput, setVariantInput] = useState("");
   const router = useRouter();
 
@@ -69,7 +72,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const [colorImages, setColorImages] = useState<Record<string, string>>(initialColorImages);
 
   useEffect(() => {
-    getCategories().then(setCategories).catch(console.error);
+    Promise.all([getCategories(), getStores()]).then(([cats, storesData]) => {
+      setCategories(cats);
+      setStores(storesData);
+    }).catch(console.error);
   }, []);
 
   const form = useForm<FormValues>({
@@ -114,6 +120,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
         await createProduct({
           ...productData,
           category: productData.category,
+          store_id: selectedStoreId || undefined,
         });
         toast.success("Producto creado correctamente");
       }
@@ -236,6 +243,32 @@ export function ProductForm({ initialData }: ProductFormProps) {
             )}
           />
         </div>
+
+        {/* Store selector — only for new products */}
+        {!initialData && stores.length > 0 && (
+          <div className="flex flex-col gap-2 p-4 rounded-lg border bg-muted/20">
+            <div className="flex items-center gap-2 mb-1">
+              <StoreIcon className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">Asignar a Tienda</span>
+            </div>
+            <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar tienda (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {stores.filter(s => s.is_active).map((store) => (
+                  <SelectItem key={store.id} value={store.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: store.color }} />
+                      {store.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">El stock inicial se asignará al inventario de esta tienda.</p>
+          </div>
+        )}
 
         <FormField
           control={form.control}

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { query } from "../db/pool.js";
+import { query, withTransaction } from "../db/pool.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { validateColorOptions } from "../lib/color-validation.js";
 
@@ -130,7 +130,7 @@ router.get("/:id", async (req, res) => {
 // POST /api/products — admin only
 router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price } = req.body;
+    const { name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price, store_id } = req.body;
 
     // Validate color variant options
     if (variant_type === 'color' && Array.isArray(variant_options)) {
@@ -141,13 +141,35 @@ router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
       }
     }
 
-    const result = await query(
-      `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-       RETURNING *`,
-      [name, description, price, category, images || [], stock || 0, featured || false, barcode, variant_type || 'none', variant_options || [], JSON.stringify(variant_prices || {}), JSON.stringify(variant_images || {}), status || 'active', subcategory, unit_type, supplier, purchase_price]
-    );
-    res.status(201).json(parseProduct(result.rows[0]));
+    const result = await withTransaction(async (client) => {
+      const productResult = await client.query(
+        `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         RETURNING *`,
+        [name, description, price, category, images || [], stock || 0, featured || false, barcode, variant_type || 'none', variant_options || [], JSON.stringify(variant_prices || {}), JSON.stringify(variant_images || {}), status || 'active', subcategory, unit_type, supplier, purchase_price]
+      );
+
+      const product = productResult.rows[0];
+
+      // Assign stock to store if store_id provided
+      if (store_id && (stock || 0) > 0) {
+        await client.query(
+          `INSERT INTO store_inventory (store_id, product_id, stock)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (store_id, product_id)
+           DO UPDATE SET stock = store_inventory.stock + $3, updated_at = NOW()`,
+          [store_id, product.id, stock || 0]
+        );
+        await client.query(
+          "INSERT INTO inventory_movements (product_id, user_id, quantity_change, movement_type, reason, store_id) VALUES ($1,$2,$3,$4,$5,$6)",
+          [product.id, (req as any).user.userId, stock || 0, 'in', 'Stock inicial al crear producto', store_id]
+        );
+      }
+
+      return product;
+    });
+
+    res.status(201).json(parseProduct(result));
   } catch (err: any) {
     console.error("Create product error:", err);
     res.status(500).json({ error: "Error al crear producto" });
@@ -157,7 +179,7 @@ router.post("/", requireAuth, requireRole("ADMIN"), async (req, res) => {
 // POST /api/products/bulk — admin: bulk create products
 router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { products } = req.body;
+    const { products, store_id } = req.body;
     if (!Array.isArray(products) || products.length === 0) {
       res.status(400).json({ error: "Debe enviar un array de productos" });
       return;
@@ -167,6 +189,7 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
       return;
     }
 
+    const userId = (req as any).user.userId;
     const results: { success: any[]; errors: { row: number; name: string; error: string }[] } = { success: [], errors: [] };
 
     for (let i = 0; i < products.length; i++) {
@@ -176,31 +199,55 @@ router.post("/bulk", requireAuth, requireRole("ADMIN"), async (req, res) => {
           results.errors.push({ row: i + 1, name: p.name || "Sin nombre", error: "Nombre y precio son obligatorios" });
           continue;
         }
-        const result = await query(
-          `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-           RETURNING *`,
-          [
-            p.name,
-            p.description || "",
-            parseFloat(p.price) || 0,
-            p.category || "",
-            p.images || [],
-            parseInt(p.stock) || 0,
-            p.featured === true || p.featured === "true" || p.featured === "si" || p.featured === "sí",
-            p.barcode || null,
-            p.variant_type || "none",
-            p.variant_options || [],
-            JSON.stringify(p.variant_prices || {}),
-            JSON.stringify(p.variant_images || {}),
-            p.status || "active",
-            p.subcategory || null,
-            p.unit_type || null,
-            p.supplier || null,
-            p.purchase_price ? parseFloat(p.purchase_price) : null,
-          ]
-        );
-        results.success.push(parseProduct(result.rows[0]));
+
+        const created = await withTransaction(async (client) => {
+          const result = await client.query(
+            `INSERT INTO skating_products (name, description, price, category, images, stock, featured, barcode, variant_type, variant_options, variant_prices, variant_images, status, subcategory, unit_type, supplier, purchase_price)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+             RETURNING *`,
+            [
+              p.name,
+              p.description || "",
+              parseFloat(p.price) || 0,
+              p.category || "",
+              p.images || [],
+              parseInt(p.stock) || 0,
+              p.featured === true || p.featured === "true" || p.featured === "si" || p.featured === "sí",
+              p.barcode || null,
+              p.variant_type || "none",
+              p.variant_options || [],
+              JSON.stringify(p.variant_prices || {}),
+              JSON.stringify(p.variant_images || {}),
+              p.status || "active",
+              p.subcategory || null,
+              p.unit_type || null,
+              p.supplier || null,
+              p.purchase_price ? parseFloat(p.purchase_price) : null,
+            ]
+          );
+
+          const product = result.rows[0];
+          const stockQty = parseInt(p.stock) || 0;
+
+          // Assign stock to store if store_id provided
+          if (store_id && stockQty > 0) {
+            await client.query(
+              `INSERT INTO store_inventory (store_id, product_id, stock)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (store_id, product_id)
+               DO UPDATE SET stock = store_inventory.stock + $3, updated_at = NOW()`,
+              [store_id, product.id, stockQty]
+            );
+            await client.query(
+              "INSERT INTO inventory_movements (product_id, user_id, quantity_change, movement_type, reason, store_id) VALUES ($1,$2,$3,$4,$5,$6)",
+              [product.id, userId, stockQty, 'in', 'Stock inicial - carga masiva', store_id]
+            );
+          }
+
+          return product;
+        });
+
+        results.success.push(parseProduct(created));
       } catch (err: any) {
         results.errors.push({ row: i + 1, name: p.name || "Sin nombre", error: err.message || "Error desconocido" });
       }

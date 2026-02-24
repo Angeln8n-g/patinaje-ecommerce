@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Download, Loader2, X } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Download, Loader2, X, Store as StoreIcon } from "lucide-react";
 import { bulkCreateProducts } from "@/lib/skating-store/product-actions";
+import { getStores } from "@/lib/skating-store/store-actions";
+import { Store } from "@/types/skating-store";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface ParsedRow {
   name: string;
@@ -189,7 +193,13 @@ export function BulkProductUpload({ onComplete }: { onComplete?: () => void }) {
   const [fileName, setFileName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getStores().then(setStores).catch(() => {});
+  }, []);
 
   const reset = () => {
     setStep("upload");
@@ -244,9 +254,13 @@ export function BulkProductUpload({ onComplete }: { onComplete?: () => void }) {
 
   const handleUpload = async () => {
     if (parsedProducts.length === 0) return;
+    if (!selectedStoreId) {
+      toast.error("Selecciona una tienda antes de subir los productos");
+      return;
+    }
     setIsUploading(true);
     try {
-      const res = await bulkCreateProducts(parsedProducts);
+      const res = await bulkCreateProducts(parsedProducts, selectedStoreId);
       setResult(res);
       setStep("result");
       if (res.created > 0) {
@@ -356,6 +370,9 @@ export function BulkProductUpload({ onComplete }: { onComplete?: () => void }) {
             fileName={fileName}
             parsedProducts={parsedProducts}
             isUploading={isUploading}
+            stores={stores}
+            selectedStoreId={selectedStoreId}
+            onStoreChange={setSelectedStoreId}
             onReset={reset}
             onUpload={handleUpload}
           />}
@@ -367,10 +384,13 @@ export function BulkProductUpload({ onComplete }: { onComplete?: () => void }) {
   );
 }
 
-function PreviewStep({ fileName, parsedProducts, isUploading, onReset, onUpload }: {
+function PreviewStep({ fileName, parsedProducts, isUploading, stores, selectedStoreId, onStoreChange, onReset, onUpload }: {
   fileName: string;
   parsedProducts: ParsedRow[];
   isUploading: boolean;
+  stores: Store[];
+  selectedStoreId: string;
+  onStoreChange: (id: string) => void;
   onReset: () => void;
   onUpload: () => void;
 }) {
@@ -384,6 +404,29 @@ function PreviewStep({ fileName, parsedProducts, isUploading, onReset, onUpload 
         <Button variant="ghost" size="sm" onClick={onReset}>
           <X className="mr-1 h-4 w-4" /> Cambiar archivo
         </Button>
+      </div>
+
+      {/* Store selector */}
+      <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+        <StoreIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className="flex-1">
+          <Label className="text-sm font-medium">Tienda destino *</Label>
+          <Select value={selectedStoreId} onValueChange={onStoreChange}>
+            <SelectTrigger className={!selectedStoreId ? "border-amber-400" : ""}>
+              <SelectValue placeholder="Seleccionar tienda..." />
+            </SelectTrigger>
+            <SelectContent>
+              {stores.filter(s => s.is_active).map((store) => (
+                <SelectItem key={store.id} value={store.id}>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: store.color }} />
+                    {store.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="rounded-lg border overflow-auto max-h-[400px]">
@@ -444,7 +487,7 @@ function PreviewStep({ fileName, parsedProducts, isUploading, onReset, onUpload 
 
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={onReset}>Cancelar</Button>
-        <Button onClick={onUpload} disabled={isUploading}>
+        <Button onClick={onUpload} disabled={isUploading || !selectedStoreId}>
           {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Subiendo...</> : <><Upload className="mr-2 h-4 w-4" /> Crear {parsedProducts.length} Productos</>}
         </Button>
       </div>

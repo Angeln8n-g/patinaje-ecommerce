@@ -27,12 +27,12 @@ async function authServerFetch(endpoint: string, options: { method?: string; bod
   return res.json();
 }
 
-export async function createProduct(data: Omit<Product, "id" | "created_at" | "updated_at">) {
+export async function createProduct(data: Omit<Product, "id" | "created_at" | "updated_at"> & { store_id?: string }) {
   return authServerFetch("/api/products", { method: "POST", body: data });
 }
 
-export async function bulkCreateProducts(products: Record<string, any>[]) {
-  return authServerFetch("/api/products/bulk", { method: "POST", body: { products } });
+export async function bulkCreateProducts(products: Record<string, any>[], storeId?: string) {
+  return authServerFetch("/api/products/bulk", { method: "POST", body: { products, store_id: storeId } });
 }
 
 export async function updateProduct(id: string, data: Partial<Product>) {
