@@ -90,7 +90,23 @@ export interface InventoryMovement {
   quantity_change: number;
   movement_type: 'in' | 'out' | 'adjustment';
   reason?: string;
+  store_id?: string;
   created_at: string;
+}
+
+export interface StoreInventoryItem {
+  id: string;
+  store_id: string;
+  product_id: string;
+  stock: number;
+  product_name: string;
+  barcode?: string;
+  price: number;
+  category: string;
+  images?: string[];
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CartItem {

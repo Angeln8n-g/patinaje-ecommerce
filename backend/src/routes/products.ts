@@ -60,20 +60,48 @@ router.get("/barcode/:barcode", async (req, res) => {
   }
 });
 
-// GET /api/products/search-pos — seller: search products for POS
+// GET /api/products/search-pos — seller: search products for POS (store-aware)
 router.get("/search-pos", requireAuth, requireRole("SELLER"), async (req, res) => {
   try {
     const searchTerm = (req.query.q as string || "").trim();
+    const storeId = req.query.store_id as string;
     if (!searchTerm) { res.json([]); return; }
 
-    // Try exact barcode match first
+    // If store_id provided, search with store-level stock
+    if (storeId) {
+      // Try exact barcode match first
+      const barcodeResult = await query(
+        `SELECT p.*, COALESCE(si.stock, 0) as store_stock
+         FROM skating_products p
+         LEFT JOIN store_inventory si ON si.product_id = p.id AND si.store_id = $2
+         WHERE p.status = 'active' AND COALESCE(si.stock, 0) > 0 AND p.barcode = $1 LIMIT 1`,
+        [searchTerm, storeId]
+      );
+      if (barcodeResult.rows.length > 0) {
+        res.json(barcodeResult.rows.map(r => parseProduct({ ...r, stock: r.store_stock })));
+        return;
+      }
+
+      // Fallback to name search
+      const result = await query(
+        `SELECT p.*, COALESCE(si.stock, 0) as store_stock
+         FROM skating_products p
+         LEFT JOIN store_inventory si ON si.product_id = p.id AND si.store_id = $2
+         WHERE p.status = 'active' AND COALESCE(si.stock, 0) > 0 AND p.name ILIKE $1
+         ORDER BY p.name LIMIT 20`,
+        ["%" + searchTerm + "%", storeId]
+      );
+      res.json(result.rows.map(r => parseProduct({ ...r, stock: r.store_stock })));
+      return;
+    }
+
+    // Fallback: global stock (backward compatible)
     const barcodeResult = await query(
       "SELECT * FROM skating_products WHERE status = 'active' AND stock > 0 AND barcode = $1 LIMIT 1",
       [searchTerm]
     );
     if (barcodeResult.rows.length > 0) { res.json(barcodeResult.rows.map(parseProduct)); return; }
 
-    // Fallback to name search
     const result = await query(
       "SELECT * FROM skating_products WHERE status = 'active' AND stock > 0 AND name ILIKE $1 ORDER BY name LIMIT 20",
       ["%" + searchTerm + "%"]

@@ -67,3 +67,17 @@ export async function updateStoreLocation(storeId: string, lat: number, lng: num
 export async function updateStoreShippingConfig(storeId: string, shippingConfig: any) {
   return apiFetch(`/api/stores/${storeId}/shipping-config`, { method: "PUT", body: { shipping_config: shippingConfig } });
 }
+
+export async function getStoreInventory(storeId: string) {
+  return apiFetch(`/api/stores/${storeId}/inventory`);
+}
+
+export async function transferInventory(data: {
+  product_id: string;
+  from_store_id: string;
+  to_store_id: string;
+  quantity: number;
+  reason?: string;
+}) {
+  return apiFetch("/api/inventory/transfer", { method: "POST", body: data });
+}

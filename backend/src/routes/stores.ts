@@ -167,6 +167,28 @@ router.put("/:id/shipping-config", requireAuth, requireRole("ADMIN"), async (req
   }
 });
 
+// GET /api/stores/:id/inventory — get store inventory with product details
+router.get("/:id/inventory", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT si.stock as store_stock, p.*
+       FROM store_inventory si
+       JOIN skating_products p ON p.id = si.product_id
+       WHERE si.store_id = $1 AND si.stock > 0
+       ORDER BY p.name ASC`,
+      [req.params.id]
+    );
+    res.json(result.rows.map(row => ({
+      ...row,
+      price: row.price != null ? parseFloat(row.price) : 0,
+      stock: row.store_stock != null ? parseInt(row.store_stock) : 0,
+      global_stock: row.stock != null ? parseInt(row.stock) : 0,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener inventario de tienda" });
+  }
+});
+
 // PUT /api/stores/:id/location — save location for store (admin)
 router.put("/:id/location", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {

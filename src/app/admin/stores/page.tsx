@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { getStores, createStore, updateStore, deleteStore, assignSellerToStore, removeSellerFromStore, assignZoneToStore, removeZoneFromStore, getStoreById, updateStoreLocation, updateStoreShippingConfig } from "@/lib/skating-store/store-actions";
+import { getStores, createStore, updateStore, deleteStore, assignSellerToStore, removeSellerFromStore, assignZoneToStore, removeZoneFromStore, getStoreById, updateStoreLocation, updateStoreShippingConfig, getStoreInventory } from "@/lib/skating-store/store-actions";
 import { getSellers } from "@/lib/skating-store/user-actions";
 import { getDeliveryZones } from "@/lib/skating-store/zone-actions";
 import { Store, DeliveryZone, ShippingConfig } from "@/types/skating-store";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, MapPin, Users, Map, Eye, Store as StoreIcon } from "lucide-react";
+import { Loader2, Plus, Trash2, MapPin, Users, Map, Eye, Store as StoreIcon, Package } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -70,6 +70,10 @@ export default function StoresPage() {
   const [shippingAllowNoZones, setShippingAllowNoZones] = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
 
+  // Store inventory
+  const [storeInventory, setStoreInventory] = useState<any[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     try {
       const [storesData, sellersData, zonesData] = await Promise.all([
@@ -106,6 +110,7 @@ export default function StoresPage() {
   const openDetail = async (store: Store) => {
     setDetailOpen(true);
     setDetailLoading(true);
+    setStoreInventory([]);
     try {
       const full = await getStoreById(store.id);
       setDetailStore(full);
@@ -205,6 +210,15 @@ export default function StoresPage() {
 
   const sellerName = (s: { first_name?: string; last_name?: string; email: string }) =>
     s.first_name ? `${s.first_name} ${s.last_name || ""}`.trim() : s.email;
+
+  const loadStoreInventory = async (storeId: string) => {
+    setInventoryLoading(true);
+    try {
+      const inv = await getStoreInventory(storeId);
+      setStoreInventory(inv);
+    } catch { toast.error("Error al cargar inventario"); }
+    finally { setInventoryLoading(false); }
+  };
 
   // Sellers not yet assigned to this store
   const availableSellers = detailStore
@@ -344,8 +358,9 @@ export default function StoresPage() {
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : detailStore && (
             <Tabs defaultValue="team" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="team">Equipo</TabsTrigger>
+                <TabsTrigger value="inventory" onClick={() => detailStore && loadStoreInventory(detailStore.id)}>Inventario</TabsTrigger>
                 <TabsTrigger value="location">Ubicación</TabsTrigger>
                 <TabsTrigger value="zones">Zonas</TabsTrigger>
                 <TabsTrigger value="shipping">Envío</TabsTrigger>
@@ -379,6 +394,39 @@ export default function StoresPage() {
                   </Select>
                   <Button onClick={handleAssignSeller} disabled={!selectedSellerId} size="sm">Asignar</Button>
                 </div>
+              </TabsContent>
+
+              {/* Tab: Inventario */}
+              <TabsContent value="inventory" className="space-y-4 mt-4">
+                <h3 className="font-semibold flex items-center gap-2"><Package className="h-4 w-4" /> Inventario de la Tienda</h3>
+                {inventoryLoading ? (
+                  <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                ) : storeInventory.length > 0 ? (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead className="text-right">Stock Tienda</TableHead>
+                          <TableHead className="text-right">Stock Global</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {storeInventory.map((item: any) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell className="capitalize">{item.category}</TableCell>
+                            <TableCell className="text-right font-bold">{item.stock}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{item.global_stock}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Esta tienda no tiene inventario asignado. Ve a Gestión de Inventario para agregar stock.</p>
+                )}
               </TabsContent>
 
               {/* Tab: Ubicación */}

@@ -15,12 +15,13 @@ export async function addInventoryMovement(movement: Omit<InventoryMovement, "id
 export async function updateProductStock(
   productId: string, quantityChange: number,
   movementType: "in" | "out" | "adjustment",
-  reason?: string, newPrice?: number
+  reason?: string, newPrice?: number,
+  storeId?: string
 ) {
-  // Update stock via inventory endpoint
+  // Update stock via inventory endpoint (store-aware)
   await authFetch("/api/inventory", {
     method: "POST",
-    body: { product_id: productId, quantity_change: quantityChange, movement_type: movementType, reason },
+    body: { product_id: productId, quantity_change: quantityChange, movement_type: movementType, reason, store_id: storeId },
   });
   // Update price if changed
   if (newPrice !== undefined) {
