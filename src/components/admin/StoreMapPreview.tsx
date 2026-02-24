@@ -30,8 +30,8 @@ export default function StoreMapPreview({ stores, zones }: Props) {
   // (zones without store assignment use their own color or default blue)
 
   return (
-    <div className="h-[400px] w-full rounded-lg overflow-hidden border">
-      <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }}>
+    <div className="h-[400px] w-full rounded-lg overflow-hidden border" style={{ position: "relative", zIndex: 0 }}>
+      <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%", zIndex: 0 }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -22,6 +22,11 @@ const StoreMapPreview = dynamic(() => import("@/components/admin/StoreMapPreview
   loading: () => <div className="h-[300px] flex items-center justify-center bg-muted rounded-lg border">Cargando mapa...</div>,
 });
 
+const StoreLocationPicker = dynamic(() => import("@/components/admin/StoreLocationPicker"), {
+  ssr: false,
+  loading: () => <div className="h-[250px] flex items-center justify-center bg-muted rounded-lg border text-sm text-muted-foreground">Cargando mapa...</div>,
+});
+
 interface SellerProfile {
   id: string; email: string; first_name?: string; last_name?: string; role: string;
 }
@@ -37,6 +42,8 @@ export default function StoresPage() {
   const [formName, setFormName] = useState("");
   const [formAddress, setFormAddress] = useState("");
   const [formColor, setFormColor] = useState("#3b82f6");
+  const [formLat, setFormLat] = useState<number | null>(null);
+  const [formLng, setFormLng] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Detail dialog
@@ -64,10 +71,10 @@ export default function StoresPage() {
     if (!formName.trim()) { toast.error("El nombre es requerido"); return; }
     setSaving(true);
     try {
-      await createStore({ name: formName.trim(), address: formAddress, color: formColor });
+      await createStore({ name: formName.trim(), address: formAddress, color: formColor, lat: formLat ?? undefined, lng: formLng ?? undefined });
       toast.success("Tienda creada");
       setCreateOpen(false);
-      setFormName(""); setFormAddress(""); setFormColor("#3b82f6");
+      setFormName(""); setFormAddress(""); setFormColor("#3b82f6"); setFormLat(null); setFormLng(null);
       await loadData();
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
@@ -217,7 +224,7 @@ export default function StoresPage() {
 
       {/* Create Store Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nueva Tienda</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
@@ -227,6 +234,21 @@ export default function StoresPage() {
             <div className="space-y-1">
               <Label>Dirección</Label>
               <Input value={formAddress} onChange={(e) => setFormAddress(e.target.value)} placeholder="Dirección (opcional)" />
+            </div>
+            <div className="space-y-1">
+              <Label>Ubicación en el mapa</Label>
+              <p className="text-xs text-muted-foreground">Haz clic en el mapa para seleccionar la ubicación de la tienda</p>
+              <StoreLocationPicker
+                lat={formLat}
+                lng={formLng}
+                onSelect={(lat, lng) => { setFormLat(lat); setFormLng(lng); }}
+              />
+              {formLat && formLng && (
+                <p className="text-xs text-muted-foreground">
+                  <MapPin className="inline h-3 w-3 mr-1" />
+                  {formLat.toFixed(6)}, {formLng.toFixed(6)}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Color identificador</Label>
