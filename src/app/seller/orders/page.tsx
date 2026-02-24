@@ -21,13 +21,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, AlertTriangle, ArrowUp, ArrowDown, Receipt, XCircle } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, ArrowUp, ArrowDown, Receipt, XCircle, Truck } from "lucide-react";
 import { getSellerOrders, markOrderAsDispatched } from "@/lib/skating-store/seller-actions";
 import { createProductExchange, searchProductsForPOS } from "@/lib/skating-store/pos-actions";
 import { cancelSellerOrder } from "@/lib/skating-store/order-cancellation-actions";
+import { getAllDeliveryMen, assignShipment } from "@/lib/skating-store/delivery-actions";
 import { Order, Product } from "@/types/skating-store";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiscalInvoiceDialog } from "@/components/fiscal/FiscalInvoiceDialog";
 import { CancelOrderModal } from "@/components/shared/CancelOrderModal";
 
@@ -68,6 +70,13 @@ export default function SellerOrdersPage() {
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Delivery assignment state
+  const [deliveryMen, setDeliveryMen] = useState<any[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignOrderId, setAssignOrderId] = useState<string | null>(null);
+  const [selectedDeliveryManId, setSelectedDeliveryManId] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
   const loadOrders = async (from?: string, to?: string) => {
     setLoading(true);
     try {
@@ -85,6 +94,7 @@ export default function SellerOrdersPage() {
 
   useEffect(() => {
     loadOrders();
+    getAllDeliveryMen().then(setDeliveryMen).catch(() => {});
   }, []);
 
   const handleFilter = () => {
@@ -178,6 +188,23 @@ export default function SellerOrdersPage() {
     }
   };
 
+  const handleAssignDelivery = async () => {
+    if (!assignOrderId || !selectedDeliveryManId) return;
+    setAssigning(true);
+    try {
+      await assignShipment(assignOrderId, selectedDeliveryManId);
+      toast.success("Repartidor asignado correctamente");
+      setAssignOpen(false);
+      setAssignOrderId(null);
+      setSelectedDeliveryManId("");
+      await loadOrders(dateFrom || undefined, dateTo || undefined);
+    } catch (error: any) {
+      toast.error(error.message || "Error al asignar repartidor");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Historial de Pedidos</h1>
@@ -236,6 +263,7 @@ export default function SellerOrdersPage() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Envío</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -261,6 +289,28 @@ export default function SellerOrdersPage() {
                       >
                         {statusLabels[order.status] || order.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {(order as any).shipment ? (
+                        <Badge variant="outline" className="text-xs">
+                          {(order as any).shipment.status}
+                        </Badge>
+                      ) : order.order_type === "online" && order.status !== "delivered" && order.status !== "cancelled" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7"
+                          onClick={() => {
+                            setAssignOrderId(order.id);
+                            setSelectedDeliveryManId("");
+                            setAssignOpen(true);
+                          }}
+                        >
+                          <Truck className="h-3 w-3 mr-1" /> Asignar
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs">
                       {new Date(order.created_at).toLocaleDateString()}
@@ -499,6 +549,44 @@ export default function SellerOrdersPage() {
         onConfirm={handleCancelOrder}
         loading={isCancelling}
       />
+
+      {/* Assign Delivery Dialog */}
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Asignar Repartidor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Pedido #{assignOrderId?.slice(0, 8)}
+            </p>
+            <Select value={selectedDeliveryManId} onValueChange={setSelectedDeliveryManId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar repartidor..." />
+              </SelectTrigger>
+              <SelectContent>
+                {deliveryMen.map((dm: any) => (
+                  <SelectItem key={dm.id} value={dm.id}>
+                    {dm.first_name ? `${dm.first_name} ${dm.last_name || ""}`.trim() : dm.email}
+                    {dm.avg_rating > 0 && ` ⭐ ${Number(dm.avg_rating).toFixed(1)}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              className="w-full"
+              onClick={handleAssignDelivery}
+              disabled={!selectedDeliveryManId || assigning}
+            >
+              {assigning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Truck className="h-4 w-4 mr-2" />}
+              Asignar Repartidor
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

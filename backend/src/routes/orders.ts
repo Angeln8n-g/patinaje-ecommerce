@@ -177,21 +177,26 @@ router.get("/my", requireAuth, async (req, res) => {
 router.get("/seller", requireAuth, requireRole("SELLER"), async (req, res) => {
   try {
     const sellerId = (req as any).user.userId;
-    let sql = "SELECT * FROM skating_orders WHERE seller_id = $1";
+    // Include orders assigned to seller OR orders from seller's store
+    let sql = `SELECT o.*, row_to_json(s) as shipment FROM skating_orders o
+       LEFT JOIN shipments s ON s.order_id = o.id
+       WHERE (o.seller_id = $1 OR o.store_id IN (
+         SELECT store_id FROM store_sellers WHERE seller_id = $1
+       ))`;
     const params: any[] = [sellerId];
     let idx = 2;
 
-    if (req.query.date_from) { sql += " AND created_at >= $" + (idx++); params.push(req.query.date_from); }
+    if (req.query.date_from) { sql += " AND o.created_at >= $" + (idx++); params.push(req.query.date_from); }
     if (req.query.date_to) {
       const toDate = new Date(req.query.date_to as string);
       toDate.setHours(23, 59, 59, 999);
-      sql += " AND created_at <= $" + (idx++); params.push(toDate.toISOString());
+      sql += " AND o.created_at <= $" + (idx++); params.push(toDate.toISOString());
     }
-    if (req.query.status) { sql += " AND status = $" + (idx++); params.push(req.query.status); }
+    if (req.query.status) { sql += " AND o.status = $" + (idx++); params.push(req.query.status); }
 
-    sql += " ORDER BY created_at ASC";
+    sql += " ORDER BY o.created_at ASC";
     const result = await query(sql, params);
-    res.json(result.rows.map(parseOrder));
+    res.json(result.rows.map((r: any) => ({ ...parseOrder(r), shipment: r.shipment })));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener pedidos" });
   }

@@ -40,14 +40,14 @@ export async function getDeliveryZones(): Promise<DeliveryZone[]> {
   try { return await apiFetch("/api/delivery/zones"); } catch { return []; }
 }
 
-export async function createDeliveryZone(name: string, polygon: Array<{ lat: number; lng: number }>) {
+export async function createDeliveryZone(name: string, polygon: Array<{ lat: number; lng: number }>, color?: string) {
   if (!name?.trim()) return { success: false as const, error: "El nombre de la zona es requerido" };
   if (!polygon || polygon.length < 3) return { success: false as const, error: "El polígono debe tener al menos 3 vértices" };
-  const data = await apiFetch("/api/delivery/zones", { method: "POST", body: { name: name.trim(), polygon, is_active: true } });
+  const data = await apiFetch("/api/delivery/zones", { method: "POST", body: { name: name.trim(), polygon, is_active: true, color: color || '#3b82f6' } });
   return { success: true as const, data: data as DeliveryZone };
 }
 
-export async function updateDeliveryZone(id: string, updates: { name?: string; polygon?: Array<{ lat: number; lng: number }> }) {
+export async function updateDeliveryZone(id: string, updates: { name?: string; polygon?: Array<{ lat: number; lng: number }>; color?: string }) {
   if (updates.name !== undefined && !updates.name.trim()) return { success: false as const, error: "El nombre de la zona es requerido" };
   if (updates.polygon !== undefined && updates.polygon.length < 3) return { success: false as const, error: "El polígono debe tener al menos 3 vértices" };
   await apiFetch(`/api/delivery/zones/${id}`, { method: "PUT", body: updates });

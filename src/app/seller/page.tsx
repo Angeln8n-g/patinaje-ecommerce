@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getSellerDashboardStats, getSellerOrders, markOrderAsDispatched } from "@/lib/skating-store/seller-actions";
 import { SellerDashboardStats, Order } from "@/types/skating-store";
 import { toast } from "sonner";
+import { SellerProductGrid } from "@/components/seller/SellerProductGrid";
 
 export default function SellerDashboard() {
   const [stats, setStats] = useState<SellerDashboardStats | null>(null);
@@ -94,6 +95,15 @@ export default function SellerDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Productos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SellerProductGrid />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -181,9 +181,24 @@ export interface DeliveryZone {
   id: string;
   name: string;
   polygon: Array<{ lat: number; lng: number }>;
+  color?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  sellers?: Array<{ id: string; email: string; first_name?: string; last_name?: string }>;
+  zones?: DeliveryZone[];
 }
 
 export interface DeliveryLocation {

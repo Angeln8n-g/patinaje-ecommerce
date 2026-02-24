@@ -80,6 +80,7 @@ export default function DeliveryZoneEditor() {
 
   // Form state
   const [zoneName, setZoneName] = useState("");
+  const [zoneColor, setZoneColor] = useState("#3b82f6");
 
   // UI feedback
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +122,7 @@ export default function DeliveryZoneEditor() {
     setMode("creating");
     setDrawingVertices([]);
     setZoneName("");
+    setZoneColor("#3b82f6");
     setEditingZoneId(null);
     setError(null);
     setSuccess(null);
@@ -132,6 +134,7 @@ export default function DeliveryZoneEditor() {
     setEditingZoneId(zone.id);
     setDrawingVertices([...zone.polygon]);
     setZoneName(zone.name);
+    setZoneColor(zone.color || "#3b82f6");
     setError(null);
     setSuccess(null);
   };
@@ -170,7 +173,8 @@ export default function DeliveryZoneEditor() {
       if (mode === "creating") {
         const result = await createDeliveryZone(
           zoneName.trim(),
-          drawingVertices
+          drawingVertices,
+          zoneColor
         );
         if (!result.success) {
           setError(result.error);
@@ -181,6 +185,7 @@ export default function DeliveryZoneEditor() {
         const result = await updateDeliveryZone(editingZoneId, {
           name: zoneName.trim(),
           polygon: drawingVertices,
+          color: zoneColor,
         });
         if (!result.success) {
           setError(result.error);
@@ -193,6 +198,7 @@ export default function DeliveryZoneEditor() {
       setMode("idle");
       setDrawingVertices([]);
       setZoneName("");
+      setZoneColor("#3b82f6");
       setEditingZoneId(null);
       await loadZones();
     } catch (err) {
@@ -317,6 +323,16 @@ export default function DeliveryZoneEditor() {
                 onChange={(e) => setZoneName(e.target.value)}
               />
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="zone-color">Color</Label>
+              <input
+                id="zone-color"
+                type="color"
+                value={zoneColor}
+                onChange={(e) => setZoneColor(e.target.value)}
+                className="h-10 w-14 rounded border cursor-pointer"
+              />
+            </div>
             <Button
               onClick={handleSave}
               disabled={saving || drawingVertices.length < 3 || !zoneName.trim()}
@@ -362,10 +378,10 @@ export default function DeliveryZoneEditor() {
                   positions={zone.polygon.map((v) => [v.lat, v.lng] as [number, number])}
                   pathOptions={{
                     color: zone.is_active
-                      ? ACTIVE_ZONE_COLOR
+                      ? (zone.color || ACTIVE_ZONE_COLOR)
                       : INACTIVE_ZONE_COLOR,
                     fillColor: zone.is_active
-                      ? ACTIVE_ZONE_COLOR
+                      ? (zone.color || ACTIVE_ZONE_COLOR)
                       : INACTIVE_ZONE_COLOR,
                     fillOpacity: 0.2,
                     weight: 2,
@@ -460,7 +476,7 @@ export default function DeliveryZoneEditor() {
                       className="inline-block h-3 w-3 rounded-full shrink-0"
                       style={{
                         backgroundColor: zone.is_active
-                          ? ACTIVE_ZONE_COLOR
+                          ? (zone.color || ACTIVE_ZONE_COLOR)
                           : INACTIVE_ZONE_COLOR,
                       }}
                     />

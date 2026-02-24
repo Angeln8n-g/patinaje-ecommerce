@@ -81,6 +81,11 @@ const navItems = [
     icon: UserCheck,
   },
   {
+    title: "Tiendas",
+    href: "/admin/stores",
+    icon: Store,
+  },
+  {
     title: "Zonas de Entrega",
     href: "/admin/delivery-zones",
     icon: MapPin,

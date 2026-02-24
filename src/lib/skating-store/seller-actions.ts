@@ -39,6 +39,7 @@ export async function getSellerOrders(filters?: OrderFilters): Promise<Order[]> 
       seller_id: dbOrder.seller_id,
       order_type: dbOrder.order_type,
       dispatched_at: dbOrder.dispatched_at,
+      shipment: dbOrder.shipment || null,
     }));
   } catch { return []; }
 }

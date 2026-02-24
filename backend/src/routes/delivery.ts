@@ -77,9 +77,24 @@ router.get("/shipments/by-order/:orderId", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/shipments", requireAuth, requireRole("ADMIN"), async (req, res) => {
+router.post("/shipments", requireAuth, requireRole("ADMIN", "SELLER"), async (req, res) => {
   try {
     const { order_id, delivery_man_id } = req.body;
+    const user = (req as any).user;
+
+    // If seller, verify the order belongs to them or their store
+    if (user.role === "SELLER") {
+      const orderCheck = await query(
+        `SELECT o.id FROM skating_orders o
+         WHERE o.id = $1 AND (o.seller_id = $2 OR o.store_id IN (
+           SELECT store_id FROM store_sellers WHERE seller_id = $2
+         ))`, [order_id, user.userId]
+      );
+      if (orderCheck.rows.length === 0) {
+        res.status(403).json({ error: "No tienes permiso para asignar este pedido" }); return;
+      }
+    }
+
     // Check if shipment exists for this order
     const existing = await query("SELECT id FROM shipments WHERE order_id = $1", [order_id]);
     if (existing.rows.length > 0) {
@@ -130,7 +145,7 @@ router.put("/shipments/:id", requireAuth, requireRole("ADMIN", "DELIVERY"), asyn
 // ==========================================
 // Delivery Men
 // ==========================================
-router.get("/men", requireAuth, requireRole("ADMIN"), async (_req, res) => {
+router.get("/men", requireAuth, requireRole("ADMIN", "SELLER"), async (_req, res) => {
   try {
     const result = await query(
       `SELECT p.id, p.email, p.first_name, p.last_name, p.created_at,
@@ -146,8 +161,8 @@ router.get("/men", requireAuth, requireRole("ADMIN"), async (_req, res) => {
   }
 });
 
-// GET /api/delivery/men/stats — admin: delivery men with full stats
-router.get("/men/stats", requireAuth, requireRole("ADMIN"), async (_req, res) => {
+// GET /api/delivery/men/stats — admin/seller: delivery men with full stats
+router.get("/men/stats", requireAuth, requireRole("ADMIN", "SELLER"), async (_req, res) => {
   try {
     const profiles = await query("SELECT id, email, first_name, last_name, phone, address_street, address_city, created_at FROM profiles WHERE role = 'DELIVERY'");
     const delivered = await query("SELECT delivery_man_id, COUNT(*) as cnt FROM shipments WHERE status = 'ENTREGADO' GROUP BY delivery_man_id");
@@ -197,10 +212,10 @@ router.get("/zones", async (_req, res) => {
 
 router.post("/zones", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { name, polygon, is_active } = req.body;
+    const { name, polygon, is_active, color } = req.body;
     const result = await query(
-      "INSERT INTO delivery_zones (name, polygon, is_active) VALUES ($1, $2, $3) RETURNING *",
-      [name, JSON.stringify(polygon), is_active ?? true]
+      "INSERT INTO delivery_zones (name, polygon, is_active, color) VALUES ($1, $2, $3, $4) RETURNING *",
+      [name, JSON.stringify(polygon), is_active ?? true, color || '#3b82f6']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -210,12 +225,12 @@ router.post("/zones", requireAuth, requireRole("ADMIN"), async (req, res) => {
 
 router.put("/zones/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { name, polygon, is_active } = req.body;
+    const { name, polygon, is_active, color } = req.body;
     const result = await query(
       `UPDATE delivery_zones SET name=COALESCE($2,name), polygon=COALESCE($3,polygon),
-       is_active=COALESCE($4,is_active), updated_at=NOW()
+       is_active=COALESCE($4,is_active), color=COALESCE($5,color), updated_at=NOW()
        WHERE id=$1 RETURNING *`,
-      [req.params.id, name, polygon ? JSON.stringify(polygon) : null, is_active]
+      [req.params.id, name, polygon ? JSON.stringify(polygon) : null, is_active, color]
     );
     res.json(result.rows[0]);
   } catch (err) {

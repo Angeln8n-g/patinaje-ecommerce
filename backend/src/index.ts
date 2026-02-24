@@ -21,6 +21,7 @@ import fiscalRoutes from "./routes/fiscal.js";
 import promotionRoutes from "./routes/promotions.js";
 import cancellationRoutes from "./routes/cancellations.js";
 import emailTemplateRoutes from "./routes/email-templates.js";
+import storeRoutes from "./routes/stores.js";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
@@ -52,6 +53,7 @@ app.use("/api/fiscal", fiscalRoutes);
 app.use("/api/promotions", promotionRoutes);
 app.use("/api/cancellations", cancellationRoutes);
 app.use("/api/email-templates", emailTemplateRoutes);
+app.use("/api/stores", storeRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {
