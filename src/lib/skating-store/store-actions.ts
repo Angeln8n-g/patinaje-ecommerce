@@ -59,3 +59,11 @@ export async function removeZoneFromStore(storeId: string, zoneId: string) {
 export async function getMyStore(): Promise<Store | null> {
   try { return await apiFetch("/api/stores/my/store"); } catch { return null; }
 }
+
+export async function updateStoreLocation(storeId: string, lat: number, lng: number, address?: string) {
+  return apiFetch(`/api/stores/${storeId}/location`, { method: "PUT", body: { lat, lng, address } });
+}
+
+export async function updateStoreShippingConfig(storeId: string, shippingConfig: any) {
+  return apiFetch(`/api/stores/${storeId}/shipping-config`, { method: "PUT", body: { shipping_config: shippingConfig } });
+}

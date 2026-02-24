@@ -195,6 +195,7 @@ export interface Store {
   lng?: number;
   color: string;
   is_active: boolean;
+  shipping_config?: ShippingConfig | null;
   created_at: string;
   updated_at: string;
   sellers?: Array<{ id: string; email: string; first_name?: string; last_name?: string }>;

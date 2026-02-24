@@ -152,4 +152,34 @@ router.delete("/:id/zones/:zoneId", requireAuth, requireRole("ADMIN"), async (re
   }
 });
 
+// PUT /api/stores/:id/shipping-config — save shipping config for store (admin)
+router.put("/:id/shipping-config", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { shipping_config } = req.body;
+    const result = await query(
+      "UPDATE stores SET shipping_config = $2, updated_at = NOW() WHERE id = $1 RETURNING *",
+      [req.params.id, JSON.stringify(shipping_config)]
+    );
+    if (result.rows.length === 0) { res.status(404).json({ error: "Tienda no encontrada" }); return; }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Error al guardar configuración de envío" });
+  }
+});
+
+// PUT /api/stores/:id/location — save location for store (admin)
+router.put("/:id/location", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { lat, lng, address } = req.body;
+    const result = await query(
+      "UPDATE stores SET lat = $2, lng = $3, address = COALESCE($4, address), updated_at = NOW() WHERE id = $1 RETURNING *",
+      [req.params.id, lat, lng, address]
+    );
+    if (result.rows.length === 0) { res.status(404).json({ error: "Tienda no encontrada" }); return; }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Error al guardar ubicación" });
+  }
+});
+
 export default router;
