@@ -137,6 +137,42 @@ router.get("/admin/sales-comparison", requireAuth, requireRole("ADMIN"), async (
   }
 });
 
+// GET /api/users/admin/store-stats — admin: sales stats per store
+router.get("/admin/store-stats", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    let whereClauses = ["s.is_active = true"];
+    const params: any[] = [];
+    let idx = 1;
+    if (req.query.from) { whereClauses.push(`o.created_at >= $${idx++}`); params.push(req.query.from); }
+    if (req.query.to) { whereClauses.push(`o.created_at <= $${idx++}`); params.push(req.query.to); }
+    const sql = `SELECT s.id as store_id, s.name as store_name, s.color,
+       COUNT(o.id) as total_orders, COALESCE(SUM(o.total), 0) as total_amount,
+       COUNT(CASE WHEN o.status = 'pending' THEN 1 END) as pending_orders
+       FROM stores s
+       LEFT JOIN skating_orders o ON o.store_id = s.id
+       WHERE ${whereClauses.join(" AND ")}
+       GROUP BY s.id, s.name, s.color ORDER BY total_amount DESC`;
+    const result = await query(sql, params);
+    const sellerCounts = await query(
+      "SELECT store_id, COUNT(*) as seller_count FROM store_sellers GROUP BY store_id"
+    );
+    const sellerMap = new Map(sellerCounts.rows.map((r: any) => [r.store_id, parseInt(r.seller_count)]));
+    const stats = result.rows.map((r: any) => ({
+      store_id: r.store_id,
+      store_name: r.store_name,
+      color: r.color,
+      total_orders: parseInt(r.total_orders),
+      total_amount: parseFloat(r.total_amount),
+      pending_orders: parseInt(r.pending_orders),
+      seller_count: sellerMap.get(r.store_id) || 0,
+    }));
+    res.json(stats);
+  } catch (err) {
+    console.error("Store stats error:", err);
+    res.status(500).json({ error: "Error al obtener estadísticas de tiendas" });
+  }
+});
+
 // GET /api/users/seller/dashboard — seller dashboard stats
 router.get("/seller/dashboard", requireAuth, requireRole("SELLER"), async (req, res) => {
   try {

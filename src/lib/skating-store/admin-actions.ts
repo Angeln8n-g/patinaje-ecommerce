@@ -64,6 +64,26 @@ export async function getSalesComparison(dateRange?: DateRange): Promise<SalesCo
   }
 }
 
+export interface StoreStat {
+  store_id: string;
+  store_name: string;
+  color: string;
+  total_orders: number;
+  total_amount: number;
+  pending_orders: number;
+  seller_count: number;
+}
+
+export async function getStoreStats(dateRange?: DateRange): Promise<StoreStat[]> {
+  try {
+    const params = new URLSearchParams();
+    if (dateRange?.from) params.set("from", dateRange.from);
+    if (dateRange?.to) params.set("to", dateRange.to);
+    const qs = params.toString();
+    return await apiFetch(`/api/users/admin/store-stats${qs ? "?" + qs : ""}`);
+  } catch { return []; }
+}
+
 export async function assignOrderToSeller(orderId: string, sellerId: string): Promise<void> {
   await apiFetch(`/api/orders/${orderId}`, {
     method: "PUT",

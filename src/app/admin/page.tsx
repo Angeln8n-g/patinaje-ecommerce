@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, ShoppingCart, Users, DollarSign, Loader2, Store, Globe, Truck, Star, CalendarIcon } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { getAdminDashboardStats, getSellerStats, getDeliveryStats, getSalesComparison } from "@/lib/skating-store/admin-actions";
+import { getAdminDashboardStats, getSellerStats, getDeliveryStats, getSalesComparison, getStoreStats, StoreStat } from "@/lib/skating-store/admin-actions";
 import { SellerStat, DeliveryStat, SalesComparison, DateRange } from "@/types/skating-store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [sellerStats, setSellerStats] = useState<SellerStat[]>([]);
   const [deliveryStats, setDeliveryStats] = useState<DeliveryStat[]>([]);
   const [salesComparison, setSalesComparison] = useState<SalesComparison | null>(null);
+  const [storeStats, setStoreStats] = useState<StoreStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>({});
@@ -27,39 +28,45 @@ export default function AdminDashboard() {
       getSellerStats(),
       getDeliveryStats(),
       getSalesComparison(),
-    ]).then(([dashStats, sellers, deliveries, comparison]) => {
+      getStoreStats(),
+    ]).then(([dashStats, sellers, deliveries, comparison, stores]) => {
       setStats(dashStats);
       setSellerStats(sellers);
       setDeliveryStats(deliveries);
       setSalesComparison(comparison);
+      setStoreStats(stores);
       setLoading(false);
     });
   }, []);
 
   const handleFilterApply = useCallback(async () => {
     setMetricsLoading(true);
-    const [sellers, deliveries, comparison] = await Promise.all([
+    const [sellers, deliveries, comparison, stores] = await Promise.all([
       getSellerStats(dateRange),
       getDeliveryStats(dateRange),
       getSalesComparison(dateRange),
+      getStoreStats(dateRange),
     ]);
     setSellerStats(sellers);
     setDeliveryStats(deliveries);
     setSalesComparison(comparison);
+    setStoreStats(stores);
     setMetricsLoading(false);
   }, [dateRange]);
 
   const handleFilterClear = useCallback(async () => {
     setDateRange({});
     setMetricsLoading(true);
-    const [sellers, deliveries, comparison] = await Promise.all([
+    const [sellers, deliveries, comparison, stores] = await Promise.all([
       getSellerStats(),
       getDeliveryStats(),
       getSalesComparison(),
+      getStoreStats(),
     ]);
     setSellerStats(sellers);
     setDeliveryStats(deliveries);
     setSalesComparison(comparison);
+    setStoreStats(stores);
     setMetricsLoading(false);
   }, []);
 
@@ -194,6 +201,52 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Ventas por Tienda */}
+      {storeStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Rendimiento por Tienda
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {storeStats.map((store) => (
+                <div
+                  key={store.store_id}
+                  className="rounded-lg border p-4 space-y-3 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: store.color }} />
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: store.color }} />
+                    <span className="font-semibold">{store.store_name}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Ventas</p>
+                      <p className="font-bold text-green-600">${store.total_amount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Pedidos</p>
+                      <p className="font-bold">{store.total_orders}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Pendientes</p>
+                      <p className="font-bold text-amber-500">{store.pending_orders}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Vendedores</p>
+                      <p className="font-bold">{store.seller_count}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Gráfico comparativo de ventas por vendedor */}
