@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ShoppingCart, ClipboardList, LogOut, Store, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, ClipboardList, LogOut, Store, AlertTriangle, Package, BoxesIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { getActiveSession } from "@/lib/skating-store/pos-actions";
@@ -31,6 +31,16 @@ const navItems = [
     title: "Pedidos",
     href: "/seller/orders",
     icon: ClipboardList,
+  },
+  {
+    title: "Productos Local",
+    href: "/seller/products",
+    icon: Package,
+  },
+  {
+    title: "Inventario Local",
+    href: "/seller/inventory",
+    icon: BoxesIcon,
   },
 ];
 

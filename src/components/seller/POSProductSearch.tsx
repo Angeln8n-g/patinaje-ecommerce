@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Loader2, ScanBarcode } from "lucide-react";
 import { searchProductsForPOS } from "@/lib/skating-store/pos-actions";
+import { getMyStore } from "@/lib/skating-store/seller-actions";
 import { Product } from "@/types/skating-store";
 import { BarcodeScanner } from "@/components/admin/BarcodeScanner";
 
@@ -18,8 +19,16 @@ export function POSProductSearch({ onSelectProduct }: POSProductSearchProps) {
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [storeId, setStoreId] = useState<string | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load seller's store on mount
+  useEffect(() => {
+    getMyStore().then(store => {
+      if (store?.id) setStoreId(store.id);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -33,7 +42,7 @@ export function POSProductSearch({ onSelectProduct }: POSProductSearchProps) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const data = await searchProductsForPOS(query);
+        const data = await searchProductsForPOS(query, storeId);
         setResults(data);
         setShowResults(true);
       } catch {
@@ -69,7 +78,7 @@ export function POSProductSearch({ onSelectProduct }: POSProductSearchProps) {
     setShowScanner(false);
     setSearching(true);
     try {
-      const data = await searchProductsForPOS(decodedText);
+      const data = await searchProductsForPOS(decodedText, storeId);
       if (data.length === 1) {
         // Exact match — add directly to cart
         onSelectProduct(data[0]);
@@ -87,7 +96,7 @@ export function POSProductSearch({ onSelectProduct }: POSProductSearchProps) {
     } finally {
       setSearching(false);
     }
-  }, [onSelectProduct]);
+  }, [onSelectProduct, storeId]);
 
   return (
     <div ref={containerRef} className="relative space-y-2">

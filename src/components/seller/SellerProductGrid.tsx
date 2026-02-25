@@ -5,24 +5,38 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Package } from "lucide-react";
-import { getProducts } from "@/lib/skating-store/supabase-queries";
-import { Product } from "@/types/skating-store";
+import { Loader2, Search, Package, Store as StoreIcon } from "lucide-react";
+import { getMyStoreProducts, getMyStore } from "@/lib/skating-store/seller-actions";
 import { formatCurrency } from "@/lib/utils";
 
+interface StoreProduct {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  global_stock: number;
+  barcode?: string;
+  images?: string[];
+  status: string;
+}
+
 export function SellerProductGrid() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filtered, setFiltered] = useState<Product[]>([]);
+  const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [filtered, setFiltered] = useState<StoreProduct[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [storeName, setStoreName] = useState("");
 
   useEffect(() => {
-    getProducts()
-      .then((data) => {
-        setProducts(data);
-        setFiltered(data);
-      })
-      .finally(() => setLoading(false));
+    async function load() {
+      const [prods, store] = await Promise.all([getMyStoreProducts(), getMyStore()]);
+      setProducts(prods);
+      setFiltered(prods);
+      setStoreName(store?.name || "");
+      setLoading(false);
+    }
+    load();
   }, []);
 
   useEffect(() => {
@@ -51,6 +65,11 @@ export function SellerProductGrid() {
 
   return (
     <div className="space-y-4">
+      {storeName && (
+        <p className="text-sm text-muted-foreground flex items-center gap-1">
+          <StoreIcon className="h-3 w-3" /> Productos de: {storeName}
+        </p>
+      )}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -63,7 +82,7 @@ export function SellerProductGrid() {
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-10">
-          No se encontraron productos.
+          {products.length === 0 ? "No hay productos asignados a tu tienda." : "No se encontraron productos."}
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -76,11 +95,8 @@ export function SellerProductGrid() {
   );
 }
 
-function SellerProductCard({ product }: { product: Product }) {
-  const coverImage =
-    product.images?.find((img) => !img.toLowerCase().match(/\.(mp4|webm|ogg)$/)) ||
-    product.images?.[0] ||
-    "https://placehold.co/400x400/png?text=Producto";
+function SellerProductCard({ product }: { product: StoreProduct }) {
+  const coverImage = product.images?.[0] || "https://placehold.co/400x400/png?text=Producto";
 
   return (
     <Card className="overflow-hidden border hover:shadow-md transition-shadow">

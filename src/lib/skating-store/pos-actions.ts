@@ -59,10 +59,12 @@ export async function createPOSOrder(
   return mapDbOrderToOrder(result);
 }
 
-export async function searchProductsForPOS(queryStr: string): Promise<Product[]> {
+export async function searchProductsForPOS(queryStr: string, storeId?: string): Promise<Product[]> {
   if (!queryStr || queryStr.trim() === "") return [];
   try {
-    return await apiFetch("/api/products/search-pos?q=" + encodeURIComponent(queryStr.trim()));
+    let url = "/api/products/search-pos?q=" + encodeURIComponent(queryStr.trim());
+    if (storeId) url += "&store_id=" + encodeURIComponent(storeId);
+    return await apiFetch(url);
   } catch { return []; }
 }
 

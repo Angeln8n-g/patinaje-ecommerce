@@ -50,3 +50,26 @@ export async function markOrderAsDispatched(orderId: string): Promise<void> {
     body: { status: "delivered", dispatched_at: new Date().toISOString() },
   });
 }
+
+export async function getMyStoreProducts(): Promise<any[]> {
+  try {
+    // First get seller's store
+    const store = await apiFetch("/api/stores/my/store");
+    if (!store?.id) return [];
+    // Get store inventory (products with store-level stock)
+    return await apiFetch(`/api/stores/${store.id}/inventory`);
+  } catch { return []; }
+}
+
+export async function getMyStoreInventoryMovements(): Promise<any[]> {
+  try {
+    const store = await apiFetch("/api/stores/my/store");
+    if (!store?.id) return [];
+    return await apiFetch(`/api/inventory?store_id=${store.id}`);
+  } catch { return []; }
+}
+
+export async function getMyStore(): Promise<any | null> {
+  try { return await apiFetch("/api/stores/my/store"); }
+  catch { return null; }
+}
