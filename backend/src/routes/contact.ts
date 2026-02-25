@@ -1,16 +1,18 @@
 import { Router } from "express";
 import { query } from "../db/pool.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
+import { validate, contactSchema } from "../lib/validators.js";
+import { sanitize } from "../lib/sanitize.js";
 
 const router = Router();
 
-// POST /api/contact — public
-router.post("/", async (req, res) => {
+// POST /api/contact — public (validated + sanitized)
+router.post("/", validate(contactSchema), async (req, res) => {
   try {
     const { name, email, message } = req.body;
     const result = await query(
       "INSERT INTO skating_contact_messages (name, email, message) VALUES ($1,$2,$3) RETURNING *",
-      [name, email, message]
+      [sanitize(name), email.trim().toLowerCase(), sanitize(message)]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

@@ -2,7 +2,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = process.env.JWT_SECRET || "change-me";
+if (!process.env.JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Server cannot start without it.");
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 const TOKEN_EXPIRY = "7d";
 
 export interface JwtPayload {
@@ -27,12 +30,24 @@ export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
 }
 
-// Express middleware: attaches req.user if valid token
+// Express middleware: attaches req.user if valid token (checks header first, then httpOnly cookie)
 export function authenticate(req: Request, _res: Response, next: NextFunction) {
+  let token: string | undefined;
+
+  // Priority 1: Authorization header
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) {
+    token = header.slice(7);
+  }
+
+  // Priority 2: httpOnly cookie
+  if (!token && req.cookies?.skating_token) {
+    token = req.cookies.skating_token;
+  }
+
+  if (token) {
     try {
-      const payload = verifyToken(header.slice(7));
+      const payload = verifyToken(token);
       (req as any).user = payload;
     } catch {
       // token invalid — user stays null

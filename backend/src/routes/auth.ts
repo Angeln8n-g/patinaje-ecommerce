@@ -2,30 +2,49 @@ import { Router } from "express";
 import { query } from "../db/pool.js";
 import { hashPassword, comparePassword, signToken, requireAuth } from "../lib/auth.js";
 import { OAuth2Client } from "google-auth-library";
-import { Resend } from "resend";
 import crypto from "crypto";
+import {
+  validate,
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+  updateProfileSchema,
+} from "../lib/validators.js";
+import { sanitize } from "../lib/sanitize.js";
+import { logger } from "../lib/logger.js";
+import { enqueueEmail } from "../lib/email-queue.js";
 
 const router = Router();
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://hunykho.com";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+/** Set httpOnly cookie with the JWT token */
+function setTokenCookie(res: any, token: string) {
+  res.cookie("skating_token", token, {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: "lax" as const,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+  });
+}
+
+/** Clear the auth cookie */
+function clearTokenCookie(res: any) {
+  res.clearCookie("skating_token", { path: "/" });
+}
 
 // POST /api/auth/register
-router.post("/register", async (req, res) => {
+router.post("/register", validate(registerSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({ error: "Email y contraseña requeridos" });
-      return;
-    }
-    if (password.length < 6) {
-      res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
-      return;
-    }
 
-    const existing = await query("SELECT id FROM profiles WHERE email = $1", [email.toLowerCase()]);
+    const existing = await query("SELECT id FROM profiles WHERE email = $1", [email]);
     if (existing.rows.length > 0) {
       res.status(409).json({ error: "El email ya está registrado" });
       return;
@@ -36,31 +55,28 @@ router.post("/register", async (req, res) => {
       `INSERT INTO profiles (email, password_hash, email_confirmed, auth_provider)
        VALUES ($1, $2, TRUE, 'email')
        RETURNING id, email, role`,
-      [email.toLowerCase(), hash]
+      [email, hash]
     );
 
     const user = result.rows[0];
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
+    setTokenCookie(res, token);
     res.status(201).json({ user: { id: user.id, email: user.email, role: user.role }, token });
   } catch (err: any) {
-    console.error("Register error:", err);
+    logger.error({ err, email: req.body.email }, "Register error");
     res.status(500).json({ error: "Error al registrar" });
   }
 });
 
 // POST /api/auth/login
-router.post("/login", async (req, res) => {
+router.post("/login", validate(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({ error: "Email y contraseña requeridos" });
-      return;
-    }
 
     const result = await query(
       "SELECT id, email, password_hash, role, auth_provider FROM profiles WHERE email = $1",
-      [email.toLowerCase()]
+      [email]
     );
 
     if (result.rows.length === 0) {
@@ -77,18 +93,21 @@ router.post("/login", async (req, res) => {
 
     const valid = await comparePassword(password, user.password_hash);
     if (!valid) {
+      logger.security("login_failed", { email, ip: req.ip });
       res.status(401).json({ error: "Credenciales inválidas" });
       return;
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
+    logger.security("login_success", { userId: user.id, email, ip: req.ip });
+    setTokenCookie(res, token);
     res.json({
       user: { id: user.id, email: user.email, role: user.role },
       token,
     });
   } catch (err: any) {
-    console.error("Login error:", err);
+    logger.error({ err }, "Login error");
     res.status(500).json({ error: "Error al iniciar sesión" });
   }
 });
@@ -116,13 +135,11 @@ router.post("/google", async (req, res) => {
 
     const { email, sub: googleId, given_name, family_name } = payload;
 
-    // Check if user exists
     const existing = await query("SELECT id, email, role, auth_provider FROM profiles WHERE email = $1", [email.toLowerCase()]);
 
     let user;
     if (existing.rows.length > 0) {
       user = existing.rows[0];
-      // Link Google if not already linked
       if (user.auth_provider !== "google") {
         await query(
           "UPDATE profiles SET auth_provider = 'google', auth_provider_id = $2, updated_at = NOW() WHERE id = $1",
@@ -130,7 +147,6 @@ router.post("/google", async (req, res) => {
         );
       }
     } else {
-      // Create new user
       const result = await query(
         `INSERT INTO profiles (email, auth_provider, auth_provider_id, first_name, last_name, email_confirmed)
          VALUES ($1, 'google', $2, $3, $4, TRUE)
@@ -142,26 +158,29 @@ router.post("/google", async (req, res) => {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
+    setTokenCookie(res, token);
     res.json({
       user: { id: user.id, email: user.email, role: user.role },
       token,
     });
   } catch (err: any) {
-    console.error("Google auth error:", err);
+    logger.error({ err }, "Google auth error");
     res.status(500).json({ error: "Error al autenticar con Google" });
   }
 });
 
+// POST /api/auth/logout — clear httpOnly cookie
+router.post("/logout", (_req, res) => {
+  clearTokenCookie(res);
+  res.json({ success: true });
+});
+
 // POST /api/auth/forgot-password — send reset email
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", validate(forgotPasswordSchema), async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      res.status(400).json({ error: "Email requerido" });
-      return;
-    }
 
-    const userResult = await query("SELECT id, email, auth_provider FROM profiles WHERE email = $1", [email.toLowerCase()]);
+    const userResult = await query("SELECT id, email, auth_provider FROM profiles WHERE email = $1", [email]);
 
     // Always return success to prevent email enumeration
     if (userResult.rows.length === 0) {
@@ -174,18 +193,19 @@ router.post("/forgot-password", async (req, res) => {
     // Invalidate previous tokens
     await query("UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE", [user.id]);
 
-    // Generate token
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    // Generate token — store a hash, send the raw token to the user
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     await query(
       "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)",
-      [user.id, resetToken, expiresAt]
+      [user.id, tokenHash, expiresAt]
     );
 
-    const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}`;
 
-    await resend.emails.send({
+    enqueueEmail({
       from: "Skating Store <noreply@hunykho.com>",
       to: user.email,
       subject: "Recupera tu contraseña - Skating Store",
@@ -204,29 +224,25 @@ router.post("/forgot-password", async (req, res) => {
       `,
     });
 
+    logger.security("password_reset_requested", { userId: user.id, email: user.email });
     res.json({ success: true, message: "Si el email existe, recibirás un enlace de recuperación" });
   } catch (err: any) {
-    console.error("Forgot password error:", err);
+    logger.error({ err }, "Forgot password error");
     res.status(500).json({ error: "Error al enviar correo de recuperación" });
   }
 });
 
 // POST /api/auth/reset-password — reset password with token
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", validate(resetPasswordSchema), async (req, res) => {
   try {
     const { token, password } = req.body;
-    if (!token || !password) {
-      res.status(400).json({ error: "Token y contraseña requeridos" });
-      return;
-    }
-    if (password.length < 6) {
-      res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
-      return;
-    }
+
+    // Hash the incoming token to compare against stored hash
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     const tokenResult = await query(
       "SELECT id, user_id, expires_at, used FROM password_reset_tokens WHERE token = $1",
-      [token]
+      [tokenHash]
     );
 
     if (tokenResult.rows.length === 0) {
@@ -248,13 +264,12 @@ router.post("/reset-password", async (req, res) => {
 
     const hash = await hashPassword(password);
 
-    // Update password and mark token as used
     await query("UPDATE profiles SET password_hash = $2, auth_provider = 'email', updated_at = NOW() WHERE id = $1", [resetToken.user_id, hash]);
     await query("UPDATE password_reset_tokens SET used = TRUE WHERE id = $1", [resetToken.id]);
 
     res.json({ success: true, message: "Contraseña actualizada correctamente" });
   } catch (err: any) {
-    console.error("Reset password error:", err);
+    logger.error({ err }, "Reset password error");
     res.status(500).json({ error: "Error al restablecer contraseña" });
   }
 });
@@ -276,13 +291,13 @@ router.get("/me", requireAuth, async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("Get me error:", err);
+    logger.error({ err }, "Get me error");
     res.status(500).json({ error: "Error al obtener perfil" });
   }
 });
 
-// PUT /api/auth/profile — update own profile
-router.put("/profile", requireAuth, async (req, res) => {
+// PUT /api/auth/profile — update own profile (sanitized)
+router.put("/profile", requireAuth, validate(updateProfileSchema), async (req, res) => {
   try {
     const userId = (req as any).user.userId;
     const { first_name, last_name, phone, address_street, address_city, address_state, address_postal_code, address_country } = req.body;
@@ -300,32 +315,173 @@ router.put("/profile", requireAuth, async (req, res) => {
         updated_at = NOW()
        WHERE id = $1
        RETURNING id, email, role, first_name, last_name, phone, address_street, address_city, address_state, address_postal_code, address_country`,
-      [userId, first_name, last_name, phone, address_street, address_city, address_state, address_postal_code, address_country]
+      [userId, sanitize(first_name), sanitize(last_name), sanitize(phone), sanitize(address_street), sanitize(address_city), sanitize(address_state), sanitize(address_postal_code), sanitize(address_country)]
     );
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("Update profile error:", err);
+    logger.error({ err }, "Update profile error");
     res.status(500).json({ error: "Error al actualizar perfil" });
   }
 });
 
-// PUT /api/auth/password — change password (authenticated)
-router.put("/password", requireAuth, async (req, res) => {
+// PUT /api/auth/password — change password (requires current password)
+router.put("/password", requireAuth, validate(changePasswordSchema), async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    const { password } = req.body;
-    if (!password || password.length < 6) {
-      res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+    const { current_password, password } = req.body;
+
+    // Verify current password
+    const userResult = await query("SELECT password_hash FROM profiles WHERE id = $1", [userId]);
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
+
+    const user = userResult.rows[0];
+    if (!user.password_hash) {
+      res.status(400).json({ error: "Esta cuenta usa autenticación social. No se puede cambiar la contraseña." });
+      return;
+    }
+
+    const valid = await comparePassword(current_password, user.password_hash);
+    if (!valid) {
+      res.status(401).json({ error: "La contraseña actual es incorrecta" });
+      return;
+    }
+
     const hash = await hashPassword(password);
     await query("UPDATE profiles SET password_hash = $2, updated_at = NOW() WHERE id = $1", [userId, hash]);
     res.json({ success: true });
   } catch (err) {
-    console.error("Change password error:", err);
+    logger.error({ err }, "Change password error");
     res.status(500).json({ error: "Error al cambiar contraseña" });
   }
 });
 
+// DELETE /api/auth/account — delete own account (right to be forgotten)
+router.delete("/account", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { password } = req.body;
+
+    // Verify identity: require password for email users
+    const userResult = await query("SELECT id, password_hash, auth_provider FROM profiles WHERE id = $1", [userId]);
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    // Email users must confirm with password
+    if (user.auth_provider === "email" && user.password_hash) {
+      if (!password) {
+        res.status(400).json({ error: "Debes confirmar tu contraseña para eliminar la cuenta" });
+        return;
+      }
+      const valid = await comparePassword(password, user.password_hash);
+      if (!valid) {
+        res.status(401).json({ error: "Contraseña incorrecta" });
+        return;
+      }
+    }
+
+    // Anonymize personal data instead of hard delete to preserve order history integrity
+    await query(
+      `UPDATE profiles SET
+        email = 'deleted_' || id || '@removed.local',
+        password_hash = NULL,
+        first_name = NULL,
+        last_name = NULL,
+        phone = NULL,
+        address_street = NULL,
+        address_city = NULL,
+        address_state = NULL,
+        address_postal_code = NULL,
+        address_country = NULL,
+        auth_provider_id = NULL,
+        updated_at = NOW()
+       WHERE id = $1`,
+      [userId]
+    );
+
+    // Delete related personal data
+    await query("DELETE FROM carts WHERE user_id = $1", [userId]);
+    await query("DELETE FROM favorites WHERE user_id = $1", [userId]);
+    await query("DELETE FROM skating_notifications WHERE user_id = $1", [userId]);
+    await query("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
+
+    logger.security("account_deleted", { userId, ip: req.ip });
+    clearTokenCookie(res);
+    res.json({ success: true, message: "Cuenta eliminada exitosamente. Tus datos personales han sido removidos." });
+  } catch (err) {
+    logger.error({ err }, "Delete account error");
+    res.status(500).json({ error: "Error al eliminar la cuenta" });
+  }
+});
+
 export default router;
+
+// DELETE /api/auth/account — delete own account (right to be forgotten)
+router.delete("/account", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { password } = req.body;
+
+    // Verify identity: require password for email users
+    const userResult = await query("SELECT id, password_hash, auth_provider FROM profiles WHERE id = $1", [userId]);
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    // Email users must confirm with password
+    if (user.auth_provider === "email" && user.password_hash) {
+      if (!password) {
+        res.status(400).json({ error: "Debes confirmar tu contraseña para eliminar la cuenta" });
+        return;
+      }
+      const valid = await comparePassword(password, user.password_hash);
+      if (!valid) {
+        res.status(401).json({ error: "Contraseña incorrecta" });
+        return;
+      }
+    }
+
+    // Anonymize personal data instead of hard delete to preserve order history integrity
+    await query(
+      `UPDATE profiles SET
+        email = 'deleted_' || id || '@removed.local',
+        password_hash = NULL,
+        first_name = NULL,
+        last_name = NULL,
+        phone = NULL,
+        address_street = NULL,
+        address_city = NULL,
+        address_state = NULL,
+        address_postal_code = NULL,
+        address_country = NULL,
+        auth_provider_id = NULL,
+        updated_at = NOW()
+       WHERE id = $1`,
+      [userId]
+    );
+
+    // Delete related personal data
+    await query("DELETE FROM carts WHERE user_id = $1", [userId]);
+    await query("DELETE FROM favorites WHERE user_id = $1", [userId]);
+    await query("DELETE FROM skating_notifications WHERE user_id = $1", [userId]);
+    await query("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
+
+    logger.security("account_deleted", { userId, ip: req.ip });
+    clearTokenCookie(res);
+    res.json({ success: true, message: "Cuenta eliminada exitosamente. Tus datos personales han sido removidos." });
+  } catch (err) {
+    logger.error({ err }, "Delete account error");
+    res.status(500).json({ error: "Error al eliminar la cuenta" });
+  }
+});
+

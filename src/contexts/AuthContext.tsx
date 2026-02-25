@@ -28,7 +28,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<AuthUser>;
   signUp: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (credential: string) => Promise<AuthUser>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -48,12 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = async () => {
-    const token = getToken();
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
+    // Try with httpOnly cookie first (credentials: "include" in apiClient),
+    // fall back to localStorage token for backward compatibility
     try {
+      const token = getToken();
       const profile = await apiClient<AuthUser>("/api/auth/me", { token });
       setUser(profile);
     } catch {
@@ -65,8 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const handleAuthResponse = (data: { user: AuthUser; token: string }) => {
+    // Backend now sets httpOnly cookie automatically.
+    // Keep localStorage as fallback during migration.
     setToken(data.token);
-    document.cookie = `skating_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
     setUser(data.user);
   };
 
@@ -96,9 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.user;
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    // Clear httpOnly cookie on the server
+    try {
+      await apiClient("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Best effort — clear local state regardless
+    }
     removeToken();
-    document.cookie = "skating_token=; path=/; max-age=0";
     setUser(null);
   };
 

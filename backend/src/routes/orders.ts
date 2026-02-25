@@ -2,6 +2,9 @@ import { Router } from "express";
 import { query, withTransaction } from "../db/pool.js";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { cancelOrder } from "../lib/cancellation-service.js";
+import { validate, createOrderSchema } from "../lib/validators.js";
+import { sanitize } from "../lib/sanitize.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -16,19 +19,32 @@ function parseOrder(row: any) {
   };
 }
 
-// POST /api/orders — create order (authenticated)
-router.post("/", requireAuth, async (req, res) => {
+// POST /api/orders — create order (authenticated, validated, idempotent)
+router.post("/", requireAuth, validate(createOrderSchema), async (req, res) => {
   try {
     const userId = (req as any).user.userId;
     const { customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, items, total, payment_method, shipping_lat, shipping_lng, fiscal_data } = req.body;
+
+    // Idempotency: check for duplicate order in last 30 seconds from same user with same total
+    const recentDupe = await query(
+      `SELECT id FROM skating_orders
+       WHERE user_id = $1 AND total = $2 AND created_at > NOW() - INTERVAL '30 seconds'
+       LIMIT 1`,
+      [userId, total]
+    );
+    if (recentDupe.rows.length > 0) {
+      res.status(409).json({ error: "Pedido duplicado detectado. Espera unos segundos.", order_id: recentDupe.rows[0].id });
+      return;
+    }
+
     const result = await query(
       `INSERT INTO skating_orders (user_id, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, items, total, payment_method, shipping_lat, shipping_lng, fiscal_data)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [userId, customer_name, customer_address, customer_city, customer_postal_code, customer_phone, customer_email, JSON.stringify(items), total, payment_method || 'card', shipping_lat, shipping_lng, fiscal_data ? JSON.stringify(fiscal_data) : null]
+      [userId, sanitize(customer_name), sanitize(customer_address), sanitize(customer_city), sanitize(customer_postal_code), sanitize(customer_phone), customer_email, JSON.stringify(items), total, payment_method, shipping_lat, shipping_lng, fiscal_data ? JSON.stringify(fiscal_data) : null]
     );
     res.status(201).json(parseOrder(result.rows[0]));
   } catch (err) {
-    console.error("Create order error:", err);
+    logger.error({ err }, "Create order error");
     res.status(500).json({ error: "Error al crear pedido" });
   }
 });
@@ -50,10 +66,10 @@ router.post("/pos", requireAuth, requireRole("SELLER"), async (req, res) => {
     const activeSessionId = sessionResult.rows[0].id;
 
     const order = await withTransaction(async (client) => {
-      // Validate stock
+      // Lock product rows to prevent overselling (SELECT ... FOR UPDATE)
       const productIds = items.map((i: any) => i.product_id);
       const productsResult = await client.query(
-        "SELECT id, stock, status, name, price FROM skating_products WHERE id = ANY($1)", [productIds]
+        "SELECT id, stock, status, name, price FROM skating_products WHERE id = ANY($1) FOR UPDATE", [productIds]
       );
       const productMap = new Map(productsResult.rows.map((p: any) => [p.id, p]));
 
@@ -101,7 +117,7 @@ router.post("/pos", requireAuth, requireRole("SELLER"), async (req, res) => {
 
     res.status(201).json(parseOrder(order));
   } catch (err: any) {
-    console.error("Create POS order error:", err);
+    logger.error({ err }, "Create POS order error");
     res.status(400).json({ error: err.message || "Error al crear pedido POS" });
   }
 });
@@ -255,7 +271,7 @@ router.post("/:id/cancel", requireAuth, async (req, res) => {
     res.json(result);
   } catch (err: any) {
     const statusCode = err.statusCode || 500;
-    console.error("Cancel order error:", err);
+    logger.error({ err, orderId: req.params.id }, "Cancel order error");
     res.status(statusCode).json({ error: err.message || "Error al cancelar el pedido" });
   }
 });
@@ -305,7 +321,7 @@ router.put("/:id", requireAuth, requireRole("ADMIN", "SELLER", "DELIVERY"), asyn
     if (result.rows.length === 0) { res.status(404).json({ error: "Pedido no encontrado" }); return; }
     res.json(parseOrder(result.rows[0]));
   } catch (err) {
-    console.error("Update order error:", err);
+    logger.error({ err, orderId: req.params.id }, "Update order error");
     res.status(500).json({ error: "Error al actualizar pedido" });
   }
 });

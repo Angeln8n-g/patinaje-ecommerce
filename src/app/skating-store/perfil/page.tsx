@@ -41,7 +41,7 @@ export default function ProfilePage() {
     address_street: "", address_city: "", address_state: "",
     address_postal_code: "", address_country: "",
   });
-  const [passwordData, setPasswordData] = useState({ password: "", confirmPassword: "" });
+  const [passwordData, setPasswordData] = useState({ current_password: "", password: "", confirmPassword: "" });
 
   useEffect(() => {
     if (!authLoading && !user) { router.push("/login"); return; }
@@ -78,11 +78,12 @@ export default function ProfilePage() {
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.password !== passwordData.confirmPassword) { toast.error("Las contraseñas no coinciden"); return; }
+    if (!passwordData.current_password) { toast.error("Ingresa tu contraseña actual"); return; }
     setSavingPassword(true);
     try {
-      await authFetch("/api/auth/password", { method: "PUT", body: { password: passwordData.password } });
+      await authFetch("/api/auth/password", { method: "PUT", body: { current_password: passwordData.current_password, password: passwordData.password } });
       toast.success("Contraseña actualizada correctamente");
-      setPasswordData({ password: "", confirmPassword: "" });
+      setPasswordData({ current_password: "", password: "", confirmPassword: "" });
     } catch (error: any) { toast.error(error.message || "Error al actualizar la contraseña"); }
     finally { setSavingPassword(false); }
   };
@@ -228,6 +229,7 @@ export default function ProfilePage() {
           <form onSubmit={handlePasswordSubmit} className="space-y-6">
             <Card><CardHeader className="pb-4"><CardTitle className="text-lg">Cambiar Contraseña</CardTitle></CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-1.5"><Label htmlFor="current_password" className="text-xs">Contraseña Actual</Label><Input id="current_password" type="password" value={passwordData.current_password} onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })} className="h-9" placeholder="******" /></div>
                 <div className="space-y-1.5"><Label htmlFor="new_password" className="text-xs">Nueva Contraseña</Label><Input id="new_password" type="password" value={passwordData.password} onChange={(e) => setPasswordData({ ...passwordData, password: e.target.value })} className="h-9" placeholder="******" /></div>
                 <div className="space-y-1.5"><Label htmlFor="confirm_password" className="text-xs">Confirmar Contraseña</Label><Input id="confirm_password" type="password" value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} className="h-9" placeholder="******" /></div>
               </CardContent>

@@ -1,8 +1,26 @@
 import pg from "pg";
+import { logger } from "../lib/logger.js";
 const { Pool } = pg;
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Connection pool tuning
+  max: parseInt(process.env.DB_POOL_MAX || "20"),
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  // SSL in production
+  ...(IS_PRODUCTION && { ssl: { rejectUnauthorized: false } }),
+});
+
+// Log pool errors (don't crash the server)
+pool.on("error", (err) => {
+  logger.error({ err }, "Unexpected database pool error");
+});
+
+pool.on("connect", () => {
+  logger.debug("New database connection established");
 });
 
 // Helper for single queries

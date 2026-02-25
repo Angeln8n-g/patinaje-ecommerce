@@ -15,12 +15,14 @@ export async function apiClient<T = any>(
 
   const config: RequestInit = {
     method,
+    credentials: "include", // Send httpOnly cookies automatically
     headers: {
       "Content-Type": "application/json",
       ...headers,
     },
   };
 
+  // Fallback: also send token via header if provided (for backward compatibility)
   if (token) {
     (config.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
@@ -40,6 +42,8 @@ export async function apiClient<T = any>(
 }
 
 // Token management for client-side
+// NOTE: localStorage is kept for backward compatibility during migration.
+// The primary auth mechanism is now httpOnly cookies set by the backend.
 const TOKEN_KEY = "skating_token";
 
 export function getToken(): string | null {
@@ -62,5 +66,7 @@ export async function authFetch<T = any>(
   endpoint: string,
   options: Omit<RequestOptions, "token"> = {}
 ): Promise<T> {
+  // credentials: "include" handles the httpOnly cookie automatically.
+  // Also pass localStorage token as fallback header.
   return apiClient<T>(endpoint, { ...options, token: getToken() });
 }

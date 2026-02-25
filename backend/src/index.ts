@@ -1,7 +1,12 @@
 import "dotenv/config";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import { authenticate } from "./lib/auth.js";
+import { logger } from "./lib/logger.js";
+import { requestLogger } from "./lib/request-logger.js";
 
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
@@ -26,16 +31,47 @@ import storeRoutes from "./routes/stores.js";
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
 
-// Middleware
+// --- Security Middleware ---
+
+// Helmet: security headers (X-Frame-Options, CSP, HSTS, X-Content-Type-Options, etc.)
+app.use(helmet());
+
+// CORS: require explicit origins, no wildcard fallback
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map(o => o.trim()).filter(Boolean);
+if (!allowedOrigins || allowedOrigins.length === 0) {
+  logger.warn("CORS_ORIGIN not set — defaulting to same-origin only. Set CORS_ORIGIN in .env for cross-origin access.");
+}
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(",") || "*",
+  origin: allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : false,
   credentials: true,
 }));
+
+// Global rate limit: 100 requests per minute per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas peticiones. Intenta de nuevo en un momento." },
+});
+app.use(globalLimiter);
+
+// Strict rate limit for auth endpoints: 10 requests per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados intentos. Espera 15 minutos antes de intentar de nuevo." },
+});
+
 app.use(express.json({ limit: "10mb" }));
+app.use(cookieParser());
+app.use(requestLogger); // Structured HTTP request logging
 app.use(authenticate); // Attach user to req if token present
 
-// Routes
-app.use("/api/auth", authRoutes);
+// --- Routes ---
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/content", contentRoutes);
 app.use("/api/orders", orderRoutes);
@@ -60,6 +96,41 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🛹 Skating Store API running on port ${PORT}`);
+// --- Global Error Handler ---
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  logger.error({
+    err,
+    method: req.method,
+    path: req.originalUrl,
+    userId: (req as any).user?.userId,
+  }, "Unhandled error");
+  // Never expose stack traces or internal details to the client
+  res.status(500).json({ error: "Error interno del servidor" });
 });
+
+// --- Graceful Shutdown ---
+const server = app.listen(PORT, "0.0.0.0", () => {
+  logger.info({ port: PORT }, "🛹 Skating Store API running");
+});
+
+function gracefulShutdown(signal: string) {
+  logger.info({ signal }, "Received shutdown signal, closing gracefully...");
+  server.close(() => {
+    logger.info("HTTP server closed");
+    // Close DB pool
+    import("./db/pool.js").then(({ pool }) => {
+      pool.end().then(() => {
+        logger.info("Database pool closed");
+        process.exit(0);
+      });
+    });
+  });
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
