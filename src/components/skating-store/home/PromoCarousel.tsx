@@ -135,9 +135,10 @@ export function PromoCarousel({ banners }: PromoCarouselProps) {
                 src={getValidImageUrl(banner.image_url)}
                 alt={banner.title}
                 fill
-                className="object-cover object-center scale-105 transition-transform duration-[10s] ease-linear"
+                className="object-cover object-center scale-105 transition-transform ease-linear"
                 style={{
-                  transform: index === currentIndex ? 'scale(1.1)' : 'scale(1)'
+                  transform: index === currentIndex ? 'scale(1.1)' : 'scale(1)',
+                  transitionDuration: '10s'
                 }}
                 priority={index === 0}
                 unoptimized={banner.image_url.toLowerCase().endsWith('.gif')}
