@@ -1,4 +1,4 @@
-# 🛹 Skating Store — hunykho.com
+# 🛹 Skating Store — tu-dominio.com
 
 E-commerce de artículos de patinaje con tienda online, panel de administración, punto de venta (POS), gestión de inventario multi-tienda, sistema de entregas con tracking en tiempo real y módulo de facturación fiscal (DGII — República Dominicana).
 
@@ -64,7 +64,7 @@ npm run dev
 
 | Variable | Descripción |
 |----------|------------|
-| `NEXT_PUBLIC_API_URL` | URL del backend API (ej: `https://api.hunykho.com`) |
+| `NEXT_PUBLIC_API_URL` | URL del backend API (ej: `https://api.tu-dominio.com`) |
 
 ### Backend (`.env`)
 

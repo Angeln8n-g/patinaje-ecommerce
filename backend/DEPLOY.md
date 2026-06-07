@@ -1,4 +1,4 @@
-# Deployment en VPS Contabo (hunykho.com)
+# Deployment en VPS Contabo (tu-dominio.com)
 
 ## 1. Instalar PostgreSQL
 
@@ -64,11 +64,11 @@ nano .env
 Edita con tus valores reales:
 ```
 DATABASE_URL=postgresql://skating_user:TU_PASSWORD_SEGURO@localhost:5432/skating_store
-JWT_SECRET=07a9ca8c0f41aa67912f79127bf67e82ca45512db2b7f2a8fbf3633bda02ab96873a3f73ed48a116654774dc2886c8ba44a254f4111d36409451857481e87d8b
+JWT_SECRET=
 PORT=4000
-CORS_ORIGIN=https://hunykho.com,https://trae-patinaje-ecommerce-apa9.vercel.app
+CORS_ORIGIN=
 RESEND_API_KEY=re_XXXXXXXX
-STORE_URL=https://hunykho.com
+STORE_URL=https://tu-dominio.com
 ```
 
 ## 7. Inicializar la base de datos
@@ -121,13 +121,13 @@ pm2 startup
 
 ```bash
 sudo apt install nginx -y
-sudo nano /etc/nginx/sites-available/api.hunykho.com
+sudo nano /etc/nginx/sites-available/api.tu-dominio.com
 ```
 
 ```nginx
 server {
     listen 80;
-    server_name api.hunykho.com;
+    server_name api.tu-dominio.com;
 
     location / {
         proxy_pass http://127.0.0.1:4000;
@@ -144,7 +144,7 @@ server {
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/api.hunykho.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/api.tu-dominio.com /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -153,7 +153,7 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d api.hunykho.com
+sudo certbot --nginx -d api.tu-dominio.com
 ```
 
 ## 11. Crear usuario admin

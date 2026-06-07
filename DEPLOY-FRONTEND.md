@@ -1,4 +1,4 @@
-# Despliegue del Frontend Next.js en VPS (hunykho.com)
+# Despliegue del Frontend Next.js en VPS (tu-dominio.com)
 
 > Prerequisito: Ya tienes Node.js, PM2 y Nginx instalados en tu VPS.
 
@@ -24,8 +24,8 @@ nano .env.local
 
 Pega esto:
 ```
-NEXT_PUBLIC_API_URL=https://api.hunykho.com
-NEXT_PUBLIC_RESEND_API_KEY=re_3RAU97eV_8bj95e2aNwANei9rnWVdUedJ
+NEXT_PUBLIC_API_URL=
+NEXT_PUBLIC_RESEND_API_KEY=
 ```
 
 Guarda con `Ctrl+O`, `Enter`, `Ctrl+X`.
@@ -53,14 +53,14 @@ pm2 status
 ## 6. Configurar Nginx para el frontend
 
 ```bash
-sudo nano /etc/nginx/sites-available/hunykho.com
+sudo nano /etc/nginx/sites-available/tu-dominio.com
 ```
 
 Pega esto:
 ```nginx
 server {
     listen 80;
-    server_name hunykho.com www.hunykho.com;
+    server_name tu-dominio.com www.tu-dominio.com;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -78,7 +78,7 @@ server {
 
 Activar el sitio:
 ```bash
-sudo ln -s /etc/nginx/sites-available/hunykho.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/tu-dominio.com /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -86,12 +86,12 @@ sudo systemctl reload nginx
 ## 7. SSL con Certbot
 
 Primero asegúrate de tener registros DNS tipo A apuntando a tu VPS para:
-- `hunykho.com`
-- `www.hunykho.com` (opcional)
+- `tu-dominio`
+- `tu-dominio` (opcional)
 
 Luego:
 ```bash
-sudo certbot --nginx -d hunykho.com -d www.hunykho.com
+sudo certbot --nginx -d tu-dominio.com -d www.tu-dominio.com
 ```
 
 ## 8. Actualizar CORS del backend
@@ -103,7 +103,7 @@ nano /home/skating-store/backend/.env
 
 Cambia CORS_ORIGIN a:
 ```
-CORS_ORIGIN=https://hunykho.com,https://www.hunykho.com
+CORS_ORIGIN=https://tu-dominio.com,https://www.tu-dominio.com
 ```
 
 Reinicia el backend:
@@ -113,7 +113,7 @@ pm2 restart skating-api
 
 ## 9. Verificar
 
-Abre `https://hunykho.com` en tu navegador. Deberías ver la tienda.
+Abre `https://tu-dominio.com` en tu navegador. Deberías ver la tienda.
 
 ## Módulos del panel admin
 
