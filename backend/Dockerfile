@@ -15,13 +15,14 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Copy compiled files and SQL migration files
+# Copy compiled files, database initialization schema, and SQL migration files
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/db/schema.sql ./dist/db/schema.sql
 COPY --from=builder /app/src/db/migrations ./dist/db/migrations
 
 # Expose API port
 EXPOSE 4000
 ENV PORT=4000
 
-# Automatically run database migrations at startup, then start Express server
-CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]
+# Automatically initialize database (if empty), run migrations, then start Express server
+CMD ["sh", "-c", "node dist/db/init.js && node dist/db/migrate.js && node dist/index.js"]
