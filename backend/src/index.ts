@@ -38,13 +38,33 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS: require explicit origins, no wildcard fallback
-const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map(o => o.trim()).filter(Boolean);
-if (!allowedOrigins || allowedOrigins.length === 0) {
-  logger.warn("CORS_ORIGIN not set — defaulting to same-origin only. Set CORS_ORIGIN in .env for cross-origin access.");
+// CORS: require explicit origins with robust matching (protocol & trailing-slash agnostic)
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map(o => o.trim()).filter(Boolean) || [];
+const normalizedAllowed = allowedOrigins.map(o => 
+  o.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "")
+);
+
+if (allowedOrigins.length === 0) {
+  logger.warn("CORS_ORIGIN is not set. Cross-origin requests will be blocked.");
 }
+
 app.use(cors({
-  origin: allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : false,
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+    const normalizedOrigin = origin.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const isAllowed = normalizedOrigin === "localhost" || 
+                      normalizedOrigin.startsWith("localhost:") ||
+                      normalizedOrigin === "127.0.0.1" ||
+                      normalizedAllowed.includes(normalizedOrigin);
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      logger.warn({ origin, allowedOrigins }, "CORS blocked request due to origin mismatch");
+      callback(null, false);
+    }
+  },
   credentials: true,
 }));
 
