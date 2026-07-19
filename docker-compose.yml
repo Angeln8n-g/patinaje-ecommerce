@@ -1,0 +1,79 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: skating-db
+    restart: always
+    environment:
+      POSTGRES_USER: skating_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: skating_store
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skating_user -d skating_store"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: skating-api
+    restart: always
+    expose:
+      - "4000"
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://skating_user:${DB_PASSWORD}@db:5432/skating_store
+      DB_SSL_DISABLED: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      FRONTEND_URL: ${FRONTEND_URL}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL}
+      LOG_LEVEL: info
+    labels:
+      - "coolify.link=${NEXT_PUBLIC_API_URL}"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_RESEND_API_KEY=${NEXT_PUBLIC_RESEND_API_KEY}
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+    container_name: skating-frontend
+    restart: always
+    expose:
+      - "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_RESEND_API_KEY: ${NEXT_PUBLIC_RESEND_API_KEY}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+    labels:
+      - "coolify.link=${FRONTEND_URL}"
+
+volumes:
+  postgres_data:
+    driver: local

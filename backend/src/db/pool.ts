@@ -3,6 +3,7 @@ import { logger } from "../lib/logger.js";
 const { Pool } = pg;
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DB_SSL_DISABLED = process.env.DB_SSL_DISABLED === "true";
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -10,8 +11,8 @@ export const pool = new Pool({
   max: parseInt(process.env.DB_POOL_MAX || "20"),
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
-  // SSL in production
-  ...(IS_PRODUCTION && { ssl: { rejectUnauthorized: false } }),
+  // SSL in production unless explicitly disabled
+  ...(IS_PRODUCTION && !DB_SSL_DISABLED && { ssl: { rejectUnauthorized: false } }),
 });
 
 // Log pool errors (don't crash the server)
