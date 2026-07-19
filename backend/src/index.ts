@@ -38,14 +38,33 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS: require explicit origins with robust matching (protocol & trailing-slash agnostic)
-const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map(o => o.trim()).filter(Boolean) || [];
-const normalizedAllowed = allowedOrigins.map(o => 
-  o.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "")
-);
+// CORS: require explicit origins with robust matching (protocol, quotes, trailing-slash, and www-subdomain agnostic)
+const rawCorsOrigin = process.env.CORS_ORIGIN || "";
+const allowedOrigins = rawCorsOrigin
+  .split(",")
+  .map(o => o.trim().replace(/^['"]|['"]$/g, "")) // strip single/double quotes around origins
+  .filter(Boolean);
+
+const normalizedAllowed = new Set<string>();
+allowedOrigins.forEach(o => {
+  const clean = o.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+  normalizedAllowed.add(clean);
+  // Add www variant if not present
+  if (!clean.startsWith("www.") && !clean.includes("localhost") && !clean.includes("127.0.0.1") && clean.includes(".")) {
+    normalizedAllowed.add(`www.${clean}`);
+  }
+  // Add non-www variant if present
+  if (clean.startsWith("www.")) {
+    normalizedAllowed.add(clean.substring(4));
+  }
+});
+
+const normalizedAllowedList = Array.from(normalizedAllowed);
 
 if (allowedOrigins.length === 0) {
   logger.warn("CORS_ORIGIN is not set. Cross-origin requests will be blocked.");
+} else {
+  logger.info({ rawCorsOrigin, normalizedAllowedList }, "CORS configured with allowed origins");
 }
 
 app.use(cors({
@@ -57,11 +76,11 @@ app.use(cors({
     const isAllowed = normalizedOrigin === "localhost" || 
                       normalizedOrigin.startsWith("localhost:") ||
                       normalizedOrigin === "127.0.0.1" ||
-                      normalizedAllowed.includes(normalizedOrigin);
+                      normalizedAllowed.has(normalizedOrigin);
     if (isAllowed) {
       callback(null, true);
     } else {
-      logger.warn({ origin, allowedOrigins }, "CORS blocked request due to origin mismatch");
+      logger.warn({ origin, normalizedOrigin, normalizedAllowedList, rawCorsOrigin }, "CORS blocked request due to origin mismatch");
       callback(null, false);
     }
   },
@@ -132,7 +151,7 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 
 // --- Graceful Shutdown ---
 const server = app.listen(PORT, "0.0.0.0", () => {
-  logger.info({ port: PORT }, "🛹 Skating Store API running");
+  logger.info({ port: PORT, rawCorsOrigin, normalizedAllowedList }, "🛹 Skating Store API running");
 });
 
 function gracefulShutdown(signal: string) {
