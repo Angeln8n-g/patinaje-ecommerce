@@ -34,7 +34,9 @@ const PORT = parseInt(process.env.PORT || "4000");
 // --- Security Middleware ---
 
 // Helmet: security headers (X-Frame-Options, CSP, HSTS, X-Content-Type-Options, etc.)
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 // CORS: require explicit origins, no wildcard fallback
 const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map(o => o.trim()).filter(Boolean);

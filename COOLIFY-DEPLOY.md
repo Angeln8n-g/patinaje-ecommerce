@@ -46,11 +46,7 @@ En la pestaña **Environment Variables** del recurso de Docker Compose en Coolif
 | `NEXT_PUBLIC_RESEND_API_KEY` | Tu API key de Resend (si el frontend la requiere directamente) |
 | `GOOGLE_CLIENT_ID` | Tu Client ID de Google OAuth 2.0 (opcional) |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Tu Client ID de Google OAuth 2.0 (opcional, para el frontend) |
-| `R2_ACCOUNT_ID` | ID de tu cuenta de Cloudflare R2 |
-| `R2_ACCESS_KEY_ID` | Access Key ID para R2 |
-| `R2_SECRET_ACCESS_KEY` | Secret Access Key para R2 |
-| `R2_BUCKET_NAME` | Nombre de tu bucket R2 (ej: `skating-store`) |
-| `R2_PUBLIC_URL` | URL pública de tu bucket (ej: `https://pub-xxx.r2.dev` o dominio personalizado) |
+| `BACKEND_URL` | `https://api-shopping.kasino21.com` |
 
 ---
 

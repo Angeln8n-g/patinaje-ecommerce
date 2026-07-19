@@ -2,8 +2,44 @@ import { Router } from "express";
 import multer from "multer";
 import { requireAuth, requireRole } from "../lib/auth.js";
 import { uploadFile, deleteFile, isAllowedType, isConfigured } from "../lib/storage.js";
+import { pool } from "../db/pool.js";
 
 const router = Router();
+
+// GET /api/upload/file/* — serve file from PostgreSQL database
+router.get("/file/*", async (req, res) => {
+  try {
+    const key = (req.params as any)[0];
+    if (!key) {
+      res.status(400).json({ error: "Falta la clave del archivo" });
+      return;
+    }
+
+    const { rows } = await pool.query(
+      "SELECT data, mimetype FROM uploads WHERE key = $1",
+      [key]
+    );
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Archivo no encontrado" });
+      return;
+    }
+
+    const file = rows[0];
+
+    // Set cache control headers to optimize delivery
+    res.setHeader("Content-Type", file.mimetype);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable"); // Cache for 1 year
+    
+    // Expose file cross-origin so the frontend can load it
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+    res.send(file.data);
+  } catch (err: any) {
+    console.error("Error serving file:", err);
+    res.status(500).json({ error: "Error al recuperar el archivo" });
+  }
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
